@@ -9,20 +9,20 @@ public class Camera {
     private final Vector3f front;
     private final Vector3f up;
     private float yaw;
-    private float pitch; // Agregado
+    private float pitch; 
     private float speed;
     private final float turnSpeed;
-    private Matrix4f viewMatrix = new Matrix4f(); // Agregado
+    private Matrix4f viewMatrix = new Matrix4f();
 
     public Camera() {
         position = new Vector3f(0.0f, 2.5f, 0.0f);
         front = new Vector3f(0.0f, 0.0f, -1.0f);
         up = new Vector3f(0.0f, 1.0f, 0.0f);
         yaw = -90.0f;
-        pitch = 0.0f; // Inicializado
+        pitch = 0.0f; 
         speed = 0.5f;
         turnSpeed = 2.0f;
-        updateViewMatrix(); // Inicializar la matriz
+        updateViewMatrix();
     }
 
     public Matrix4f getViewMatrix() {

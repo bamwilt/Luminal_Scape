@@ -78,14 +78,11 @@ public class SoundManager {
                 format = AL_FORMAT_STEREO16;
             }
 
-            // Crear buffer de OpenAL
             int buffer = alGenBuffers();
             alBufferData(buffer, format, rawAudio, sampleRate.get(0));
 
-            // Guardar buffer
             soundBuffers.put(name, buffer);
 
-            // Liberar memoria nativa
             LibCStdlib.free(rawAudio);
         }
     }
@@ -201,20 +198,17 @@ public class SoundManager {
     }
 
     public void cleanup() {
-        // Eliminar buffers de sonido
         for (int buffer : soundBuffers.values()) {
             alDeleteBuffers(buffer);
         }
         soundBuffers.clear();
 
-        // Eliminar fuentes de música
         for (int source : musicSources.values()) {
             alSourceStop(source);
             alDeleteSources(source);
         }
         musicSources.clear();
 
-        // Cerrar OpenAL
         alcDestroyContext(context);
         alcCloseDevice(device);
     }

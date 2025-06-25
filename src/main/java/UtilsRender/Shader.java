@@ -168,7 +168,6 @@ public class Shader {
         }
     }
 
-    // Sobrecarga para establecer un vec3 usando componentes individuales
     public void setVec3(String name, float x, float y, float z) {
         int location = glGetUniformLocation(programId, name);
         if (location != -1) {

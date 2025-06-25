@@ -40,7 +40,6 @@ public class Window {
             throw new IllegalStateException("Window already initialized");
         }
         
-        // Configurar callback de error de GLFW
         errorCallback = GLFWErrorCallback.createPrint(System.err);
         glfwSetErrorCallback(errorCallback);
 
@@ -135,7 +134,6 @@ public class Window {
         GLFWVidMode vidmode = Objects.requireNonNull(glfwGetVideoMode(monitor));
 
         if (fullscreen) {
-            // Guardar tamaño y posición ventana actual
             int[] wx = new int[1], wy = new int[1];
             glfwGetWindowPos(windowHandle, wx, wy);
             windowedPosX = wx[0];
@@ -146,19 +144,15 @@ public class Window {
             windowedWidth = ww[0];
             windowedHeight = wh[0];
 
-            // Cambiar a modo fullscreen
             glfwSetWindowMonitor(windowHandle, monitor, 0, 0, vidmode.width(), vidmode.height(), vidmode.refreshRate());
 
-            // Actualizar viewport y llamar callback
             glViewport(0, 0, vidmode.width(), vidmode.height());
             if (onResizeCallback != null) {
                 onResizeCallback.accept(vidmode.width(), vidmode.height());
             }
         } else {
-            // Volver a modo ventana con tamaño guardado
             glfwSetWindowMonitor(windowHandle, NULL, windowedPosX, windowedPosY, windowedWidth, windowedHeight, 0);
 
-            // Actualizar viewport y llamar callback
             glViewport(0, 0, windowedWidth, windowedHeight);
             if (onResizeCallback != null) {
                 onResizeCallback.accept(windowedWidth, windowedHeight);
@@ -182,7 +176,6 @@ public class Window {
             } catch (Exception e) {
                 System.err.println("Error during rendering: " + e.getMessage());
                 e.printStackTrace();
-                // Continuar el loop a pesar de errores en el render
             }
         }
     }

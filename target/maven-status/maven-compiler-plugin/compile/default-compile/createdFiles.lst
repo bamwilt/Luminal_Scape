@@ -3,14 +3,15 @@ main\Main.class
 Player\InputPlayer.class
 UtilsRender\Window.class
 Render3D\Wall.class
+Render3D\Vector2f.class
 Render3D\CollisionManager.class
 Render2D\Button.class
 UtilsRender\TimeUtils$Countdown.class
 Player\Camera.class
-UtilsRender\Import3D.class
 Render2D\Button$OnClickListener.class
 MediaUtil\SoundManager.class
 MediaUtil\SoundLoader.class
+Render3D\Import3D.class
 UtilsRender\TextureLoader.class
 UtilsRender\Shader.class
 Render2D\TextRender.class

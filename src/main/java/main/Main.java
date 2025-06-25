@@ -340,6 +340,7 @@ public class Main {
         }
         wallShader.cleanup();
         window.cleanup();
+        soundManager.cleanup();
     }
 
     private static String formatTime(int totalSeconds) {
