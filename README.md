@@ -38,7 +38,6 @@ Here are some glimpses of the game environment:
 
 ## Author  
 Bryan Maradiaga  
-Contact: [your-email@example.com] (replace with your actual email)
 
 ---
 
