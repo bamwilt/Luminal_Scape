@@ -1,8 +1,5 @@
 package MediaUtil;
 
-import java.io.File;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -14,18 +11,21 @@ public class SoundLoader {
         SOUND_PATHS.put("ambient", "sound/ambientMusic.ogg");
     }
 
+    // Corregido: usa getResourceAsStream + loadSoundFromStream en vez de
+    // convertir la URL a File y pasar la ruta a loadSound. El metodo anterior
+    // fallaba porque stb_vorbis_decode_filename no soporta rutas UTF-8 con
+    // caracteres acentuados (ej. "á" en "Imágenes"). Ahora el audio se lee
+    // directamente desde el classpath como un InputStream, evitando problemas
+    // con la codificacion de la ruta del archivo.
     public static void loadAllSounds(SoundManager soundManager) {
         for (Map.Entry<String, String> entry : SOUND_PATHS.entrySet()) {
-            try {
-                URL resource = SoundLoader.class.getClassLoader().getResource(entry.getValue());
-                if (resource == null) {
+            try (java.io.InputStream is = SoundLoader.class.getClassLoader().getResourceAsStream(entry.getValue())) {
+                if (is == null) {
                     System.err.println("Sound file not found: " + entry.getValue());
                     continue;
                 }
-                
-                File soundFile = new File(resource.toURI());
-                soundManager.loadSound(entry.getKey(), soundFile.getAbsolutePath());
-            } catch (URISyntaxException e) {
+                soundManager.loadSoundFromStream(entry.getKey(), is);
+            } catch (Exception e) {
                 System.err.println("Error loading sound: " + entry.getKey());
                 e.printStackTrace();
             }

@@ -60,7 +60,6 @@ public class SoundManager {
 
     public void loadSound(String name, String filePath) {
         try (MemoryStack stack = stackPush()) {
-            // Cargar archivo de audio
             IntBuffer channels = stack.mallocInt(1);
             IntBuffer sampleRate = stack.mallocInt(1);
             ShortBuffer rawAudio = STBVorbis.stb_vorbis_decode_filename(filePath, channels, sampleRate);
@@ -69,21 +68,43 @@ public class SoundManager {
                 throw new RuntimeException("Failed to load sound: " + filePath);
             }
 
-            // Determinar formato
-            int format = -1;
-            int channelsValue = channels.get(0);
-            if (channelsValue == 1) {
-                format = AL_FORMAT_MONO16;
-            } else if (channelsValue == 2) {
-                format = AL_FORMAT_STEREO16;
-            }
-
+            int format = channels.get(0) == 1 ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16;
             int buffer = alGenBuffers();
             alBufferData(buffer, format, rawAudio, sampleRate.get(0));
 
             soundBuffers.put(name, buffer);
-
             LibCStdlib.free(rawAudio);
+        }
+    }
+
+    // Corregido: loadSoundFromStream reemplaza loadSound con rutas de archivo.
+    // stb_vorbis_decode_filename falla con rutas UTF-8 que contienen caracteres
+    // especiales (ej. "á" en "Imágenes"). Este metodo lee el InputStream a un
+    // ByteBuffer en memoria y usa stb_vorbis_decode_memory, evitando el problema.
+    public void loadSoundFromStream(String name, java.io.InputStream inputStream) {
+        try {
+            byte[] data = inputStream.readAllBytes();
+            ByteBuffer bufferData = ByteBuffer.allocateDirect(data.length).put(data);
+            bufferData.flip();
+
+            try (MemoryStack stack = stackPush()) {
+                IntBuffer channels = stack.mallocInt(1);
+                IntBuffer sampleRate = stack.mallocInt(1);
+                ShortBuffer rawAudio = STBVorbis.stb_vorbis_decode_memory(bufferData, channels, sampleRate);
+
+                if (rawAudio == null) {
+                    throw new RuntimeException("Failed to decode sound from stream: " + name);
+                }
+
+                int format = channels.get(0) == 1 ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16;
+                int buffer = alGenBuffers();
+                alBufferData(buffer, format, rawAudio, sampleRate.get(0));
+
+                soundBuffers.put(name, buffer);
+                LibCStdlib.free(rawAudio);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load sound from stream: " + name, e);
         }
     }
 
