@@ -91,24 +91,6 @@ public class Shader {
         }
     }
 
-    public void setMatrix4f(String name, Matrix4f matrix) {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            FloatBuffer buffer = stack.mallocFloat(16);
-            matrix.get(buffer);
-            int location = glGetUniformLocation(programId, name);
-            if (location != -1) {
-                glUniformMatrix4fv(location, false, buffer);
-            }
-        }
-    }
-
-    public void setVector3f(String name, Vector3f vector) {
-        int location = glGetUniformLocation(programId, name);
-        if (location != -1) {
-            GL33.glUniform3f(location, vector.x, vector.y, vector.z);
-        }
-    }
-
     public void setFloat(String name, float value) {
         int location = glGetUniformLocation(programId, name);
         if (location != -1) {
@@ -150,13 +132,8 @@ public class Shader {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             FloatBuffer buffer = stack.mallocFloat(16);
             matrix.get(buffer);
-            setMat4(name, buffer); // Reutilizamos el anterior
+            setMat4(name, buffer);
         }
-    }
-
-    public void setMat3(String name, FloatBuffer matrix) {
-        int location = glGetUniformLocation(programId, name);
-        glUniformMatrix3fv(location, false, matrix);
     }
 
     public void setVec3(String name, Vector3f vector) {
@@ -169,12 +146,13 @@ public class Shader {
     }
 
     public void setVec3(String name, float x, float y, float z) {
-        int location = glGetUniformLocation(programId, name);
-        if (location != -1) {
-            glUniform3f(location, x, y, z);
-        } else {
-            System.err.println("Uniform '" + name + "' no encontrado en el shader.");
-        }
+        setVec3(name, new Vector3f(x, y, z));
     }
 
+    public void setVec2(String name, float x, float y) {
+        int location = glGetUniformLocation(programId, name);
+        if (location != -1) {
+            glUniform2f(location, x, y);
+        }
+    }
 }

@@ -1,22 +1,22 @@
 package Render3D;
 
+import UtilsRender.Shader;
 import UtilsRender.TextureLoader;
 import org.joml.Matrix4f;
+import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
-import UtilsRender.Shader;
-import UtilsRender.Shader;
-import UtilsRender.TextureLoader;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.FloatBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -47,7 +47,15 @@ public class Import3D {
         List<Vector2f> textureCoords = new ArrayList<>();
         List<Integer> indices = new ArrayList<>();
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(new File(modelPath)))) {
+        // Leer modelo desde el classpath (compatible Windows/Linux, sin depender
+        // de rutas de filesystem con caracteres no-ASCII).
+        InputStream is = getClass().getClassLoader().getResourceAsStream(modelPath);
+        if (is == null) {
+            System.err.println("Error loading model: " + modelPath);
+            return;
+        }
+
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 String[] tokens = line.split("\\s+");
@@ -82,20 +90,7 @@ public class Import3D {
                         for (int i = 1; i <= 3; i++) {
                             String[] faceToken = tokens[i].split("/");
                             int vertexIndex = Integer.parseInt(faceToken[0]) - 1;
-                            int texCoordIndex = faceToken.length > 1 && !faceToken[1].isEmpty() ? 
-                                               Integer.parseInt(faceToken[1]) - 1 : -1;
-                            int normalIndex = faceToken.length > 2 ? 
-                                             Integer.parseInt(faceToken[2]) - 1 : -1;
-
                             indices.add(vertexIndex);
-                            
-                            if (texCoordIndex >= 0 && texCoordIndex < textureCoords.size()) {
-                                // Agregar coordenadas de textura si existen
-                            }
-                            
-                            if (normalIndex >= 0 && normalIndex < normals.size()) {
-                                // Agregar normales si existen
-                            }
                         }
                         break;
                 }
@@ -209,16 +204,5 @@ public class Import3D {
 
     public void cleanup() {
         GL30.glDeleteVertexArrays(vao);
-
-    }
-}
-
-
-class Vector2f {
-    public float x, y;
-    
-    public Vector2f(float x, float y) {
-        this.x = x;
-        this.y = y;
     }
 }

@@ -89,13 +89,6 @@ public class Window {
             }
         });
 
-        // Callback para errores de OpenGL
-        glfwSetWindowFocusCallback(windowHandle, (window, focused) -> {
-            if (focused) {
-                System.out.println("Window focused");
-            }
-        });
-
         glfwMakeContextCurrent(windowHandle);
         glfwSwapInterval(1); // V-Sync activado por defecto
 

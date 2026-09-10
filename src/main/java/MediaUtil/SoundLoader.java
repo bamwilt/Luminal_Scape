@@ -9,6 +9,7 @@ public class SoundLoader {
     static {
         SOUND_PATHS.put("step", "sound/step.ogg");
         SOUND_PATHS.put("ambient", "sound/ambientMusic.ogg");
+        SOUND_PATHS.put("picked", "sound/picked.ogg");
     }
 
     // Corregido: usa getResourceAsStream + loadSoundFromStream en vez de

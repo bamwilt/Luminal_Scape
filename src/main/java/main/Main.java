@@ -1,7 +1,6 @@
 package main;
 
-import MediaUtil.SoundLoader;
-import MediaUtil.SoundManager;
+import MediaUtil.AudioSystem;
 import UtilsRender.TextureLoader;
 import UtilsRender.Window;
 import Render2D.Button;
@@ -9,38 +8,34 @@ import Player.Player;
 import Player.InputPlayer;
 import UtilsRender.Shader;
 import Render2D.TextRender;
-import Render3D.Room;
+import Render3D.Background;
 import Render3D.CollisionManager;
+import Render3D.DungeonManager;
+import UtilsRender.Countdown;
+import UtilsRender.FpsCounter;
 import UtilsRender.TimeUtils;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.system.MemoryStack;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.lwjgl.openal.AL10.AL_NO_ERROR;
-import static org.lwjgl.openal.AL10.alGetError;
-
 public class Main {
 
-    private static int TOTAL_TIME_SECONDS = 5 * 60;
-    private static TimeUtils.Countdown gameTimer;
+    private static Countdown gameTimer;
 
     private static Player player;
     private static InputPlayer inputPlayer;
     private static Shader wallShader;
+    private static Shader itemShader;
+    private static float elapsedTime = 0f;
     private static Window window;
     private static TextRender textRenderer;
     private static CollisionManager collisionManager;
+    private static AudioSystem audioSystem;
+    private static DungeonManager dungeonManager;
+    private static Background background;
 
-    private static Vector3f lightPos = new Vector3f(0.0f, 5.0f, 0.0f);
-    private static List<Room> rooms = new ArrayList<>();
-    private static SoundManager soundManager;
-
-    private static float stepCooldown = 0.4f;
-    private static float timeSinceLastStep = 0f;
+    private static Vector3f lightPos = new Vector3f(GameConfig.LIGHT_X, GameConfig.LIGHT_Y, GameConfig.LIGHT_Z);
 
     private static boolean showMenu = false;
     private static Button buttonMenu;
@@ -51,26 +46,21 @@ public class Main {
     private static Button buttonSalir;
 
     private static int currentFPS = 0;
-    private static int frames = 0;
-    private static float fpsTimer = 0f;
+    private static final FpsCounter fpsCounter = new FpsCounter();
 
     public static void main(String[] args) {
         initApplication();
-        initMusic();
-        gameTimer = new TimeUtils.Countdown(TOTAL_TIME_SECONDS);
+        audioSystem = new AudioSystem();
+
+        gameTimer = new Countdown(GameConfig.TOTAL_TIME_SECONDS);
         gameTimer.start();
+
         mainLoop();
         cleanup();
     }
 
-    private static void initMusic() {
-        soundManager = SoundManager.getInstance();
-        SoundLoader.loadAllSounds(soundManager);
-        soundManager.playMusic("ambient", 0.2f);
-    }
-
     private static void initApplication() {
-        window = new Window(800, 600, "Luminal Scape");
+        window = new Window(GameConfig.WINDOW_WIDTH, GameConfig.WINDOW_HEIGHT, GameConfig.WINDOW_TITLE);
         window.init();
         window.toggleFullscreen();
         collisionManager = new CollisionManager();
@@ -80,77 +70,41 @@ public class Main {
 
         initTextRenderer();
         initShaders();
-        initRooms();
+        background = new Background();
+        initDungeon();
         initButtons();
 
         GL11.glEnable(GL11.GL_DEPTH_TEST);
-
-        player.getCamera().setPosition(new Vector3f(0.0f, 3.0f, 3.0f));
     }
 
     private static void initTextRenderer() {
-        textRenderer = new TextRender("fonts/Roboto-Bold.ttf", 28);
+        textRenderer = new TextRender(GameConfig.FONT_PATH, GameConfig.FONT_SIZE);
         textRenderer.setProjection(window.getWidth(), window.getHeight());
     }
 
     private static void initShaders() {
         wallShader = new Shader("shaders/wall_vertex.glsl", "shaders/wall_fragment.glsl");
+        itemShader = new Shader("shaders/wall_vertex.glsl", "shaders/item_fragment.glsl");
     }
 
-    private static void initRooms() {
-        int wallTexture = TextureLoader.loadTexture("textures/backWall.jpg");
-        int floorTexture = TextureLoader.loadTexture("textures/Floor.jpg");
-        int ceilingTexture = TextureLoader.loadTexture("textures/Floor2.jpg");
+    private static void initDungeon() {
+        int wallTexture = TextureLoader.loadTexture(GameConfig.WALL_TEXTURE);
+        int floorTexture = TextureLoader.loadTexture(GameConfig.FLOOR_TEXTURE);
+        int ceilingTexture = TextureLoader.loadTexture(GameConfig.CEILING_TEXTURE);
 
-        float roomWidth = 20.0f;
-        float roomHeight = 8.0f;
-        float roomDepth = 20.0f;
-        float spacing = 20.0f;
+        dungeonManager = new DungeonManager(DungeonManager.sampleLayout(), wallTexture, floorTexture, ceilingTexture);
+        dungeonManager.registerCollisions(collisionManager);
 
-        for (int i = 0; i < 5; i++) {
-            Vector3f pos = new Vector3f(0.0f, 4.0f, 0.0f);
-            Room room;
-
-            switch (i) {
-                case 0:
-                    room = new Room(roomWidth, roomHeight, roomDepth, pos, wallTexture, floorTexture, ceilingTexture);
-                    room.setDoor("north", 0.5f, -3.0f);
-                    room.setDoor("south");
-                    room.setDoor("east", 0.5f);
-                    room.setDoor("west", 0.5f);
-                    room.setName("Central");
-                    break;
-                case 1:
-                    pos.x += spacing;
-                    room = new Room(roomWidth, roomHeight, roomDepth, pos, wallTexture, floorTexture, ceilingTexture);
-                    room.setDoor("west", 0.5f);
-                    room.setName("Este");
-                    break;
-                case 2:
-                    pos.x -= spacing;
-                    room = new Room(roomWidth, roomHeight, roomDepth, pos, wallTexture, floorTexture, ceilingTexture);
-                    room.setDoor("east", 0.5f);
-                    room.setName("Oeste");
-                    break;
-                case 3:
-                    pos.z -= spacing;
-                    room = new Room(roomWidth, roomHeight, roomDepth, pos, wallTexture, floorTexture, ceilingTexture);
-                    room.setDoor("south", 0.5f);
-                    room.setName("Sur");
-                    break;
-                case 4:
-                    pos.z += spacing;
-                    room = new Room(roomWidth, roomHeight, roomDepth, pos, wallTexture, floorTexture, ceilingTexture);
-                    room.setDoor("north", 0.5f);
-                    room.setName("Norte");
-                    break;
-                default:
-                    continue;
-            }
-
-            rooms.add(room);
-            room.registerCollisions(collisionManager);
+        Vector3f spawn = dungeonManager.getSpawnPosition();
+        if (spawn != null) {
+            player.setPosition(spawn);
+        } else {
+            player.getCamera().setPosition(new Vector3f(
+                    GameConfig.CAMERA_START_X,
+                    GameConfig.CAMERA_START_Y,
+                    GameConfig.CAMERA_START_Z));
         }
+        player.getCamera().setYaw(dungeonManager.getSpawnYaw());
     }
 
     private static void initButtons() {
@@ -166,19 +120,15 @@ public class Main {
 
         buttonRestartTime = new Button(baseX, baseY + 1 * spacingY, 200, 50, "Reiniciar Tiempo", textRenderer);
         buttonRestartTime.setOnClickListener(() -> {
-            gameTimer = new TimeUtils.Countdown(TOTAL_TIME_SECONDS);
+            gameTimer = new Countdown(GameConfig.TOTAL_TIME_SECONDS);
             gameTimer.start();
         });
 
-            buttonMinusFPS = new Button(baseX, baseY + 2 * spacingY, 100, 50, "-FPS", textRenderer);
-        buttonMinusFPS.setOnClickListener(() -> {
-            TimeUtils.setFPS(30);
-        });
+        buttonMinusFPS = new Button(baseX, baseY + 2 * spacingY, 100, 50, "-FPS", textRenderer);
+        buttonMinusFPS.setOnClickListener(() -> TimeUtils.setFPS(30));
 
         buttonPlusFPS = new Button(baseX + 0.18f, baseY + 2 * spacingY, 100, 50, "+FPS", textRenderer);
-        buttonPlusFPS.setOnClickListener(() -> {
-            TimeUtils.setFPS(60);
-        });
+        buttonPlusFPS.setOnClickListener(() -> TimeUtils.setFPS(60));
 
         buttonSalir = new Button(baseX, baseY + 3 * spacingY, 150, 50, "Salir", textRenderer);
         buttonSalir.setOnClickListener(() -> System.exit(0));
@@ -215,24 +165,26 @@ public class Main {
     }
 
     private static void mainLoop() {
-        TimeUtils.setFPS(60);
+        TimeUtils.setFPS(GameConfig.TARGET_FPS);
         window.loop(() -> {
             TimeUtils.update();
-            soundManager.update();
+            fpsCounter.update(TimeUtils.getDeltaTime());
+            currentFPS = fpsCounter.getCurrentFPS();
+
+            float deltaTime = TimeUtils.getDeltaTime();
+            elapsedTime += deltaTime;
+            // Los pasos solo suenan mientras la partida está activa (paso velocidad 0 si terminó)
+            float playerSpeed = gameTimer.isFinished() ? 0f : player.getVelocity().length();
+            audioSystem.update(deltaTime, playerSpeed);
+
             clearScreen();
             handleInput();
 
             if (!gameTimer.isFinished()) {
-                inputPlayer.update(TimeUtils.getDeltaTime());
-                handleFootstepSound(TimeUtils.getDeltaTime());
-            }
-
-            frames++;
-            fpsTimer += TimeUtils.getDeltaTime();
-            if (fpsTimer >= 1.0f) {
-                currentFPS = frames;
-                frames = 0;
-                fpsTimer = 0f;
+                inputPlayer.update(deltaTime);
+                if (dungeonManager.update(player.getPosition(), deltaTime)) {
+                    audioSystem.playPicked();
+                }
             }
 
             render3DScene();
@@ -240,61 +192,43 @@ public class Main {
         });
     }
 
-    private static void handleFootstepSound(float deltaTime) {
-        timeSinceLastStep += deltaTime;
-        Vector3f velocity = player.getVelocity();
-        float speed = velocity.length();
-        if (speed > 0.1f && timeSinceLastStep >= stepCooldown) {
-            float pitch = 0.9f + (float) Math.random() * 0.2f;
-            soundManager.playSound("step", 1.0f, pitch, false);
-
-            int error = alGetError();
-            if (error != AL_NO_ERROR) {
-                System.err.println("OpenAL error al reproducir paso: " + error);
-            }
-
-            timeSinceLastStep = 0f;
-        }
-    }
-
     private static void clearScreen() {
-        GL11.glClearColor(0.08f, 0.08f, 0.06f, 1.0f);
+        GL11.glClearColor(GameConfig.CLEAR_R, GameConfig.CLEAR_G, GameConfig.CLEAR_B, 1.0f);
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
     }
 
     private static void render3DScene() {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             Matrix4f projection = new Matrix4f().perspective(
-                    (float) Math.toRadians(45.0f),
+                    (float) Math.toRadians(GameConfig.FOV_DEGREES),
                     (float) window.getWidth() / window.getHeight(),
-                    0.1f,
-                    100.0f);
+                    GameConfig.NEAR_PLANE,
+                    GameConfig.FAR_PLANE);
 
             Matrix4f view = player.getCamera().getViewMatrix();
+
+            background.render(elapsedTime, window.getWidth(), window.getHeight());
 
             wallShader.use();
             wallShader.setMat4("projection", projection);
             wallShader.setMat4("view", view);
 
             wallShader.setVec3("lightPos", lightPos);
-            wallShader.setVec3("lightColor", 0.3f, 0.3f, 0.1f);
+            wallShader.setVec3("lightColor", GameConfig.LIGHT_R, GameConfig.LIGHT_G, GameConfig.LIGHT_B);
             wallShader.setVec3("viewPos", player.getCamera().getPosition());
-            wallShader.setFloat("emissionStrength", 0.2f);
-            wallShader.setFloat("glowIntensity", 0.2f);
+            wallShader.setFloat("emissionStrength", GameConfig.EMISSION_STRENGTH);
+            wallShader.setFloat("glowIntensity", GameConfig.GLOW_INTENSITY);
 
-            for (Room room : rooms) {
-                room.render(wallShader);
-            }
-        }
-    }
+            dungeonManager.render(wallShader);
 
-    private static Room getCurrentRoom(Vector3f position) {
-        for (Room room : rooms) {
-            if (room.contains(position)) {
-                return room;
-            }
+            itemShader.use();
+            itemShader.setMat4("projection", projection);
+            itemShader.setMat4("view", view);
+            itemShader.setVec3("lightPos", lightPos);
+            itemShader.setVec3("lightColor", GameConfig.LIGHT_R, GameConfig.LIGHT_G, GameConfig.LIGHT_B);
+            itemShader.setVec3("viewPos", player.getCamera().getPosition());
+            dungeonManager.renderItems(itemShader, elapsedTime);
         }
-        return null;
     }
 
     private static void renderUI() {
@@ -311,14 +245,11 @@ public class Main {
             buttonPlusFPS.draw(window.getWidth(), window.getHeight(), window.getWindowHandle());
             buttonSalir.draw(window.getWidth(), window.getHeight(), window.getWindowHandle());
 
-            Room currentRoom = getCurrentRoom(player.getPosition());
-            String roomName = "Habitacion: " + (currentRoom != null ? currentRoom.getName() : "Ninguna");
-            textRenderer.rendererRelativo(roomName, 0.01f, 0.85f, 1.0f, 1.0f, 1.0f);
+            textRenderer.rendererRelativo("Habitacion: Dungeon", 0.01f, 0.85f, 1.0f, 1.0f, 1.0f);
             textRenderer.rendererRelativo("FPS: " + currentFPS, 0.88f, 0.02f, 0.3f, 1.0f, 0.3f);
 
             float x = 0.75f;
             float y = 0.85f;
-            float dy = 0.035f;
             textRenderer.rendererRelativo("Controles: \nWASD - Moverse\nQ / E - Rotar cam\nCtrl Izq - agacharse\n Shif - Correr", x, y, 1f, 1f, 1f);
         }
 
@@ -335,12 +266,12 @@ public class Main {
     }
 
     private static void cleanup() {
-        for (Room room : rooms) {
-            room.cleanup();
-        }
+        dungeonManager.cleanup();
+        background.cleanup();
         wallShader.cleanup();
+        itemShader.cleanup();
         window.cleanup();
-        soundManager.cleanup();
+        audioSystem.cleanup();
     }
 
     private static String formatTime(int totalSeconds) {

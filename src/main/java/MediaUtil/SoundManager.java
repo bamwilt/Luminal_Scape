@@ -29,6 +29,8 @@ public class SoundManager {
     private long context;
     private final Map<String, Integer> soundBuffers = new HashMap<>();
     private final Map<String, Integer> musicSources = new HashMap<>();
+    private final List<Integer> activeSources = new LinkedList<>();
+    private static final int MAX_ACTIVE_SOURCES = 32;
     private float masterVolume = 1.0f;
 
     private SoundManager() {
@@ -55,25 +57,6 @@ public class SoundManager {
 
         if (!alCapabilities.OpenAL10) {
             throw new IllegalStateException("OpenAL 1.0 not supported");
-        }
-    }
-
-    public void loadSound(String name, String filePath) {
-        try (MemoryStack stack = stackPush()) {
-            IntBuffer channels = stack.mallocInt(1);
-            IntBuffer sampleRate = stack.mallocInt(1);
-            ShortBuffer rawAudio = STBVorbis.stb_vorbis_decode_filename(filePath, channels, sampleRate);
-
-            if (rawAudio == null) {
-                throw new RuntimeException("Failed to load sound: " + filePath);
-            }
-
-            int format = channels.get(0) == 1 ? AL_FORMAT_MONO16 : AL_FORMAT_STEREO16;
-            int buffer = alGenBuffers();
-            alBufferData(buffer, format, rawAudio, sampleRate.get(0));
-
-            soundBuffers.put(name, buffer);
-            LibCStdlib.free(rawAudio);
         }
     }
 
@@ -111,12 +94,17 @@ public class SoundManager {
     public void playSound(String name) {
         playSound(name, 1.0f, 1.0f, false);
     }
-    private final List<Integer> activeSources = new LinkedList<>();
 
     public void playSound(String name, float volume, float pitch, boolean loop) {
         if (!soundBuffers.containsKey(name)) {
             System.err.println("Sound not loaded: " + name);
             return;
+        }
+
+        // Evitar acumulación ilimitada de fuentes: reusar la más antigua terminada
+        if (!loop && activeSources.size() >= MAX_ACTIVE_SOURCES && activeSources.size() > 0) {
+            int oldest = activeSources.remove(0);
+            alDeleteSources(oldest);
         }
 
         int buffer = soundBuffers.get(name);
@@ -144,10 +132,6 @@ public class SoundManager {
                 it.remove();
             }
         }
-    }
-
-    public void loadMusic(String name, String filePath) {
-        loadSound(name, filePath); // La música usa el mismo formato
     }
 
     public void playMusic(String name) {

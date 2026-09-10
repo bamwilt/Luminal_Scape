@@ -1,21 +1,12 @@
 package Render2D;
 
-import UtilsRender.Shader;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.GL30;
-
-import java.nio.FloatBuffer;
-import static org.lwjgl.glfw.GLFW.*;
 import org.lwjgl.opengl.GL11;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL20.*;
+
+import static org.lwjgl.glfw.GLFW.*;
 
 public class Button {
 
-    private static int sharedVAO = -1;
-    private static int sharedVBO = -1;
-    private static Shader sharedShader;
+    private static SharedQuadMesh sharedMesh;
 
     private float relX, relY;
     private int x, y;
@@ -43,24 +34,13 @@ public class Button {
         this.height = height;
         this.text = text;
         this.textRenderer = textRenderer;
-        initSharedResources();
+        ensureSharedMesh();
     }
 
-    private void initSharedResources() {
-        if (sharedVAO != -1) {
-            return;
+    private static void ensureSharedMesh() {
+        if (sharedMesh == null) {
+            sharedMesh = new SharedQuadMesh();
         }
-
-        sharedVAO = GL30.glGenVertexArrays();
-        sharedVBO = glGenBuffers();
-
-        GL30.glBindVertexArray(sharedVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, sharedVBO);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, false, 2 * Float.BYTES, 0);
-        GL30.glBindVertexArray(0);
-
-        sharedShader = new Shader("shaders/button_vertex.glsl", "shaders/button_frag.glsl");
     }
 
     public void updatePosition(int windowWidth, int windowHeight) {
@@ -69,7 +49,6 @@ public class Button {
     }
 
     public void draw(int windowWidth, int windowHeight, long windowHandle) {
-        // Configurar para renderizado transparente
         GL11.glDepthMask(false);
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
@@ -90,46 +69,19 @@ public class Button {
             currentColor = normalColor;
         }
 
-        float[] vertices = new float[]{
-            x, y,
-            x + width, y,
-            x + width, y + height,
-            x, y,
-            x + width, y + height,
-            x, y + height
-        };
+        sharedMesh.draw(x, y, width, height, windowWidth, windowHeight, currentColor);
 
-        GL30.glBindVertexArray(sharedVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, sharedVBO);
-
-        FloatBuffer buffer = BufferUtils.createFloatBuffer(vertices.length);
-        buffer.put(vertices).flip();
-        glBufferData(GL_ARRAY_BUFFER, buffer, GL_DYNAMIC_DRAW);
-
-        sharedShader.use();
-        sharedShader.setFloat("screenWidth", windowWidth);
-        sharedShader.setFloat("screenHeight", windowHeight);
-        sharedShader.setVec4("buttonColor",
-                currentColor[0] / 255f,
-                currentColor[1] / 255f,
-                currentColor[2] / 255f,
-                currentColor[3] / 255f
-        );
-
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        GL30.glBindVertexArray(0);
-
-        // Dibuja texto centrado con RGB
+        float textX = x + (width * 0.5f) - (textRenderer.getTextWidth(text) / 2f);
+        float textY = y + height - (textRenderer.getTextHeight(text));
         textRenderer.renderer(
                 text,
-                x + (width * 0.5f) - (textRenderer.getTextWidth(text) / 2f),
-                y + height - (textRenderer.getTextHeight(text)),
+                textX,
+                textY,
                 textColor[0] / 255f,
                 textColor[1] / 255f,
                 textColor[2] / 255f
         );
 
-        // Restaurar configuraciones
         GL11.glDisable(GL11.GL_BLEND);
         GL11.glDepthMask(true);
     }
@@ -155,39 +107,19 @@ public class Button {
 
     // Set color con floats (0..1)
     public void setColor(float r, float g, float b, float a) {
-        normalColor = new int[]{
-            (int) (r * 255),
-            (int) (g * 255),
-            (int) (b * 255),
-            (int) (a * 255)
-        };
+        normalColor = rgbaToColor(r, g, b, a);
     }
 
     public void setHoverColor(float r, float g, float b, float a) {
-        hoverColor = new int[]{
-            (int) (r * 255),
-            (int) (g * 255),
-            (int) (b * 255),
-            (int) (a * 255)
-        };
+        hoverColor = rgbaToColor(r, g, b, a);
     }
 
     public void setPressedColor(float r, float g, float b, float a) {
-        pressedColor = new int[]{
-            (int) (r * 255),
-            (int) (g * 255),
-            (int) (b * 255),
-            (int) (a * 255)
-        };
+        pressedColor = rgbaToColor(r, g, b, a);
     }
 
     public void setDisabledColor(float r, float g, float b, float a) {
-        disabledColor = new int[]{
-            (int) (r * 255),
-            (int) (g * 255),
-            (int) (b * 255),
-            (int) (a * 255)
-        };
+        disabledColor = rgbaToColor(r, g, b, a);
     }
 
     public void setTextColor(float r, float g, float b) {
@@ -220,6 +152,15 @@ public class Button {
         textColor = new int[]{r, g, b, 255};
     }
 
+    private int[] rgbaToColor(float r, float g, float b, float a) {
+        return new int[]{
+            (int) (r * 255),
+            (int) (g * 255),
+            (int) (b * 255),
+            (int) (a * 255)
+        };
+    }
+
     public void setText(String text) {
         this.text = text;
     }
@@ -243,8 +184,9 @@ public class Button {
     }
 
     public static void cleanupShared() {
-        GL30.glDeleteVertexArrays(sharedVAO);
-        glDeleteBuffers(sharedVBO);
-        sharedShader.cleanup();
+        if (sharedMesh != null) {
+            sharedMesh.cleanup();
+            sharedMesh = null;
+        }
     }
 }

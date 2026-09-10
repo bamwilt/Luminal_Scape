@@ -46,13 +46,11 @@ public class Wall {
     // Textura
     private float textureScaleX = 1.0f;
     private float textureScaleY = 1.0f;
-    private boolean textureRepeat = false;
 
     // Instanced rendering
     private List<Matrix4f> instanceMatrices = new ArrayList<>();
     private boolean isInstanced = false;
     private int instanceCount = 0;
-    private boolean geometryDirty = false;
 
     // Constructores
     public Wall(float width, float height, float depth, int textureID, boolean withLighting) {
@@ -65,10 +63,6 @@ public class Wall {
         init(width, height, depth, color != null ? color : new float[]{1f, 1f, 0f, 1f}, withLighting);
         this.hasTexture = false;
         this.textureID = 0;
-    }
-
-    public Wall(float width, float height, float depth) {
-        this(width, height, depth, null, false);
     }
 
     private void init(float width, float height, float depth, float[] color, boolean withLighting) {
@@ -265,7 +259,6 @@ public class Wall {
 
     public void setScale(float x, float y, float z) {
         scale.set(x, y, z);
-        geometryDirty = true;
         updateModelMatrix();
     }
 
@@ -305,7 +298,6 @@ public class Wall {
         this.hasTexture = true;
         this.textureScaleX = scaleX;
         this.textureScaleY = scaleY;
-        this.textureRepeat = repeat;
 
         glBindTexture(GL_TEXTURE_2D, textureID);
         if (repeat) {

@@ -6,14 +6,14 @@ import java.util.List;
 
 public class CollisionManager {
 
-    private Vector3f testPosition;
-    private Vector3f testSize;
+    private Vector3f playerPosition;
+    private Vector3f playerSize;
 
     private final List<Wall> walls = new ArrayList<>();
 
     public void setPlayerBounds(Vector3f position, Vector3f size) {
-        this.testPosition = new Vector3f(position);
-        this.testSize = new Vector3f(size);
+        this.playerPosition = new Vector3f(position);
+        this.playerSize = new Vector3f(size);
     }
 
     public void addCollision(Wall wall) {
@@ -21,7 +21,7 @@ public class CollisionManager {
     }
 
     public boolean checkCollisions() {
-        if (testPosition == null || testSize == null) return false;
+        if (playerPosition == null || playerSize == null) return false;
 
         for (Wall wall : walls) {
             if (isColliding(wall)) {
@@ -36,14 +36,14 @@ public class CollisionManager {
         Vector3f wallSize = wall.getSize();
 
         Vector3f playerMin = new Vector3f(
-                testPosition.x - testSize.x / 2,
-                testPosition.y,
-                testPosition.z - testSize.z / 2
+                playerPosition.x - playerSize.x / 2,
+                playerPosition.y,
+                playerPosition.z - playerSize.z / 2
         );
         Vector3f playerMax = new Vector3f(
-                testPosition.x + testSize.x / 2,
-                testPosition.y + testSize.y,
-                testPosition.z + testSize.z / 2
+                playerPosition.x + playerSize.x / 2,
+                playerPosition.y + playerSize.y,
+                playerPosition.z + playerSize.z / 2
         );
 
         Vector3f wallMin = new Vector3f(

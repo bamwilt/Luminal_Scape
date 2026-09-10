@@ -98,6 +98,13 @@ public class Camera {
         updateViewMatrix();
     }
 
+    /** Orienta la cámara hacia un yaw en grados (0 = dirección +X, 90 = +Z). */
+    public void setYaw(float yaw) {
+        this.yaw = yaw;
+        updateDirection();
+        updateViewMatrix();
+    }
+
     private void updateViewMatrix() {
         viewMatrix.identity()
                 .lookAt(position, new Vector3f(position).add(front), up);
