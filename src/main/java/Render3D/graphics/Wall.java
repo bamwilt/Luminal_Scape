@@ -1,4 +1,4 @@
-package Render3D;
+package Render3D.graphics;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;

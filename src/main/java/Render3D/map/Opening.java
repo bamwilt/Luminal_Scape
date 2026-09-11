@@ -1,4 +1,6 @@
-package Render3D;
+package Render3D.map;
+
+import Render3D.graphics.Wall;
 
 import java.util.ArrayList;
 import java.util.List;

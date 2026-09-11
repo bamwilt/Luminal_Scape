@@ -37,7 +37,7 @@ public class SharedQuadMesh {
     }
 
     public void draw(float x, float y, int width, int height,
-            int windowWidth, int windowHeight, int[] rgbaColor) {
+            int windowWidth, int windowHeight, int[] rgbaColor, float cornerRadius) {
         float[] vertices = new float[]{
             x, y,
             x + width, y,
@@ -64,6 +64,9 @@ public class SharedQuadMesh {
                 rgbaColor[2] / 255f,
                 rgbaColor[3] / 255f
         );
+        shader.setVec2("uRectPos", x, y);
+        shader.setVec2("uRectSize", width, height);
+        shader.setFloat("uCornerRadius", cornerRadius);
 
         glDrawArrays(GL_TRIANGLES, 0, 6);
         GL30.glBindVertexArray(0);

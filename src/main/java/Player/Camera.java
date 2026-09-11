@@ -11,7 +11,6 @@ public class Camera {
     private float yaw;
     private float pitch; 
     private float speed;
-    private final float turnSpeed;
     private Matrix4f viewMatrix = new Matrix4f();
 
     public Camera() {
@@ -21,7 +20,6 @@ public class Camera {
         yaw = -90.0f;
         pitch = 0.0f; 
         speed = 0.5f;
-        turnSpeed = 2.0f;
         updateViewMatrix();
     }
 
@@ -55,18 +53,6 @@ public class Camera {
         updateViewMatrix();
     }
 
-    public void turnLeft() {
-        yaw -= turnSpeed;
-        updateDirection();
-        updateViewMatrix();
-    }
-
-    public void turnRight() {
-        yaw += turnSpeed;
-        updateDirection();
-        updateViewMatrix();
-    }
-
     public void moveUp(float y) {
         position.y += y;
     }
@@ -87,6 +73,10 @@ public class Camera {
 
     public Vector3f getPosition() {
         return position;
+    }
+
+    public float getYaw() {
+        return yaw;
     }
 
     public Vector3f getFront() {

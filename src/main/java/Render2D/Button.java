@@ -11,14 +11,18 @@ public class Button {
     private float relX, relY;
     private int x, y;
     private int width, height;
+    private int windowWidth;
+    private int windowHeight;
+    private float cornerRadius = 14f;
     private String text;
     private final TextRender textRenderer;
 
-    // Colores RGBA (0-255)
-    private int[] normalColor = {26, 38, 56, 255};
-    private int[] hoverColor = {60, 90, 130, 255};
-    private int[] pressedColor = {90, 130, 180, 255};
-    private int[] disabledColor = {80, 80, 80, 255};
+    // Colores RGBA (0-255); el canal A da la transparencia (por defecto algo
+    // translúcidos para integrarse mejor con el fondo).
+    private int[] normalColor = {26, 38, 56, 200};
+    private int[] hoverColor = {60, 90, 130, 215};
+    private int[] pressedColor = {90, 130, 180, 235};
+    private int[] disabledColor = {80, 80, 80, 150};
     private int[] currentColor = normalColor;
     private int[] textColor = {255, 255, 255, 255};
 
@@ -44,8 +48,22 @@ public class Button {
     }
 
     public void updatePosition(int windowWidth, int windowHeight) {
+        this.windowWidth = windowWidth;
+        this.windowHeight = windowHeight;
         x = (int) (relX * windowWidth);
         y = (int) (relY * windowHeight);
+    }
+
+    /**
+     * Reposiciona el botón en coordenadas relativas (0..1). Si ya se conoce el
+     * tamaño de la ventana, actualiza también la posición en píxeles al momento.
+     */
+    public void setPositionRelative(float newRelX, float newRelY) {
+        this.relX = newRelX;
+        this.relY = newRelY;
+        if (windowWidth > 0 && windowHeight > 0) {
+            updatePosition(windowWidth, windowHeight);
+        }
     }
 
     public void draw(int windowWidth, int windowHeight, long windowHandle) {
@@ -69,7 +87,7 @@ public class Button {
             currentColor = normalColor;
         }
 
-        sharedMesh.draw(x, y, width, height, windowWidth, windowHeight, currentColor);
+        sharedMesh.draw(x, y, width, height, windowWidth, windowHeight, currentColor, cornerRadius);
 
         float textX = x + (width * 0.5f) - (textRenderer.getTextWidth(text) / 2f);
         float textY = y + height - (textRenderer.getTextHeight(text));
@@ -163,6 +181,18 @@ public class Button {
 
     public void setText(String text) {
         this.text = text;
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
+    }
+
+    public void setCornerRadius(float cornerRadius) {
+        this.cornerRadius = cornerRadius;
     }
 
     public void setEnabled(boolean enabled) {

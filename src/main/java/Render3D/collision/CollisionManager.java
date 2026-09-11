@@ -1,5 +1,6 @@
-package Render3D;
+package Render3D.collision;
 
+import Render3D.graphics.Wall;
 import org.joml.Vector3f;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +11,7 @@ public class CollisionManager {
     private Vector3f playerSize;
 
     private final List<Wall> walls = new ArrayList<>();
+    private final List<Wall> railingWalls = new ArrayList<>();
 
     public void setPlayerBounds(Vector3f position, Vector3f size) {
         this.playerPosition = new Vector3f(position);
@@ -20,10 +22,26 @@ public class CollisionManager {
         walls.add(wall);
     }
 
+    /** Colisiones de raillings, en una lista aparte de los muros. */
+    public void addRailingCollision(Wall wall) {
+        railingWalls.add(wall);
+    }
+
+    /** Libera todas las colisiones registradas (desecha muros ya borrados en GL). */
+    public void clear() {
+        walls.clear();
+        railingWalls.clear();
+    }
+
     public boolean checkCollisions() {
         if (playerPosition == null || playerSize == null) return false;
 
         for (Wall wall : walls) {
+            if (isColliding(wall)) {
+                return true;
+            }
+        }
+        for (Wall wall : railingWalls) {
             if (isColliding(wall)) {
                 return true;
             }

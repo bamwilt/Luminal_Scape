@@ -1,4 +1,4 @@
-package Render3D;
+package Render3D.graphics;
 
 import UtilsRender.Shader;
 import org.lwjgl.BufferUtils;
@@ -11,15 +11,23 @@ import java.nio.FloatBuffer;
  * Fondo animado del exterior: un cuadrilátero a pantalla completa con un
  * shader de olas y partículas. Se dibuja sin depth test, así que las paredes
  * del nivel quedan por encima y se ve a través de ventanas y puertas.
+ *
+ * Hay varias variantes del mismo shader de espirales (dorado, azul, rojo y
+ * verde) que se eligen según el nivel actual; al avanzar de nivel van
+ * iterando.
  */
 public class Background {
 
-    private final Shader shader;
+    private final Shader[] shaders;
     private int vao;
     private int vbo;
 
     public Background() {
-        this.shader = new Shader("shaders/fondo_vertex.glsl", "shaders/fondo_fragment.glsl");
+        shaders = new Shader[4];
+        shaders[0] = new Shader("shaders/fondo_vertex.glsl", "shaders/fondo_fragment_dorado.glsl");
+        shaders[1] = new Shader("shaders/fondo_vertex.glsl", "shaders/fondo_fragment_azul.glsl");
+        shaders[2] = new Shader("shaders/fondo_vertex.glsl", "shaders/fondo_fragment_rojo.glsl");
+        shaders[3] = new Shader("shaders/fondo_vertex.glsl", "shaders/fondo_fragment_verde.glsl");
         setupQuad();
     }
 
@@ -43,11 +51,17 @@ public class Background {
         GL33.glBindVertexArray(0);
     }
 
-    public void render(float time, float width, float height) {
+    /** Número de estilos de fondo disponibles. */
+    public int getStyleCount() {
+        return shaders.length;
+    }
+
+    public void render(float time, float width, float height, int style) {
+        int index = ((style % shaders.length) + shaders.length) % shaders.length;
         GL11.glDisable(GL11.GL_DEPTH_TEST);
-        shader.use();
-        shader.setFloat("uTime", time);
-        shader.setVec2("uResolution", width, height);
+        shaders[index].use();
+        shaders[index].setFloat("uTime", time);
+        shaders[index].setVec2("uResolution", width, height);
         GL33.glBindVertexArray(vao);
         GL11.glDrawArrays(GL11.GL_TRIANGLE_STRIP, 0, 4);
         GL33.glBindVertexArray(0);
@@ -55,7 +69,9 @@ public class Background {
     }
 
     public void cleanup() {
-        shader.cleanup();
+        for (Shader shader : shaders) {
+            shader.cleanup();
+        }
         GL33.glDeleteBuffers(vbo);
         GL33.glDeleteVertexArrays(vao);
     }

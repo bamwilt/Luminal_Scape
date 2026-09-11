@@ -15,7 +15,8 @@ public final class GameConfig {
     public static final String WINDOW_TITLE = "Luminal Scape";
 
     // Tiempo de partida
-    public static final int TOTAL_TIME_SECONDS = 5 * 60;
+    public static final int TOTAL_TIME_SECONDS = 60;
+    public static final int ITEM_BONUS_SECONDS = 10;
     public static final int TARGET_FPS = 60;
 
     // Recursos
@@ -24,6 +25,9 @@ public final class GameConfig {
     public static final String CEILING_TEXTURE = "textures/Floor2.jpg";
     public static final String FONT_PATH = "fonts/Roboto-Bold.ttf";
     public static final int FONT_SIZE = 28;
+
+    // Mensajes grandes de visión
+    public static final int VISION_FONT_SIZE = 64;
 
     // Iluminación
     public static final float LIGHT_X = 0.0f;

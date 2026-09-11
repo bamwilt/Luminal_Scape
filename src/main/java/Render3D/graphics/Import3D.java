@@ -1,4 +1,4 @@
-package Render3D;
+package Render3D.graphics;
 
 import UtilsRender.Shader;
 import UtilsRender.TextureLoader;

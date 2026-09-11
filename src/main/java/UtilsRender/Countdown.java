@@ -4,54 +4,73 @@ package UtilsRender;
  * Contador regresivo simple. Separado de TimeUtils para respetar
  * Single Responsibility: TimeUtils maneja tiempo global, Countdown
  * maneja un temporizador de juego.
+ *
+ * Soportea pausa/reanudación acumulada: {@link #pause()} detiene la cuenta y
+ * {@link #resume()} la continúa donde quedó (no se pierde el tiempo pausado).
  */
 public class Countdown {
 
-    private final long durationMillis;
-    private long startTimeMillis;
-    private boolean running;
+    private long durationMillis;
+    private long accumulatedMillis = 0;
+    private long lastStartMillis = 0;
+    private boolean running = false;
 
     public Countdown(float durationSeconds) {
         this.durationMillis = (long) (durationSeconds * 1000);
     }
 
+    /** Inicia desde cero (o reinicia si ya estaba en marcha). */
     public void start() {
-        startTimeMillis = System.currentTimeMillis();
+        accumulatedMillis = 0;
+        lastStartMillis = System.currentTimeMillis();
         running = true;
     }
 
-    public void stop() {
-        running = false;
+    public void pause() {
+        if (running) {
+            accumulatedMillis += System.currentTimeMillis() - lastStartMillis;
+            running = false;
+        }
     }
 
-    public void reset() {
-        startTimeMillis = System.currentTimeMillis();
+    public void resume() {
+        if (!running) {
+            lastStartMillis = System.currentTimeMillis();
+            running = true;
+        }
+    }
+
+    public void stop() {
+        pause();
+    }
+
+    /** Añade tiempo extra al contador (p. ej. bonus por recoger items). */
+    public void addSeconds(float seconds) {
+        durationMillis += (long) (seconds * 1000);
     }
 
     public boolean isRunning() {
         return running;
     }
 
-    public boolean isFinished() {
-        if (!running) {
-            return true;
+    private long elapsedMillis() {
+        long elapsed = accumulatedMillis;
+        if (running) {
+            elapsed += System.currentTimeMillis() - lastStartMillis;
         }
-        return System.currentTimeMillis() - startTimeMillis >= durationMillis;
+        return elapsed;
+    }
+
+    public boolean isFinished() {
+        return elapsedMillis() >= durationMillis;
     }
 
     public float getRemainingSeconds() {
-        if (!running) {
-            return 0f;
-        }
-        long elapsed = System.currentTimeMillis() - startTimeMillis;
-        long remaining = durationMillis - elapsed;
+        long remaining = durationMillis - elapsedMillis();
         return remaining > 0 ? remaining / 1000f : 0f;
     }
 
     public float getElapsedSeconds() {
-        if (!running) {
-            return 0f;
-        }
-        return (System.currentTimeMillis() - startTimeMillis) / 1000f;
+        return elapsedMillis() / 1000f;
     }
 }

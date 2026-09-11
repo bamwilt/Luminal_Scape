@@ -1,7 +1,7 @@
 package Player;
 
 import org.joml.Vector3f;
-import Render3D.CollisionManager;
+import Render3D.collision.CollisionManager;
 
 public class Player {
 
@@ -75,14 +75,6 @@ public class Player {
             t = 1.0f;
         }
         return start + t * (end - start);
-    }
-
-    public void rotateLeft() {
-        camera.turnLeft();
-    }
-
-    public void rotateRight() {
-        camera.turnRight();
     }
 
     public void setRunning(boolean running) {

@@ -90,6 +90,10 @@ public class TextRender {
     }
 
     public void renderer(String texto, float x, float y, float r, float g, float b) {
+        renderer(texto, x, y, r, g, b, 1f);
+    }
+
+    public void renderer(String texto, float x, float y, float r, float g, float b, float alpha) {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -102,7 +106,7 @@ public class TextRender {
 
         shader.setMat4("proj", projectionMatrix);
         shader.setMat4("model", modelMatrix);
-        shader.setVec3("color", r, g, b);
+        shader.setVec4("color", r, g, b, alpha);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textureID);

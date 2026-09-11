@@ -1,5 +1,7 @@
-package Render3D;
+package Render3D.map;
 
+import Render3D.collision.CollisionManager;
+import Render3D.graphics.Wall;
 import UtilsRender.Shader;
 import org.joml.Vector3f;
 
@@ -7,6 +9,25 @@ import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.List;
+
+import static Render3D.map.MapConfig.SymbolType;
+import static Render3D.map.MapConfig.CELL_SIZE;
+import static Render3D.map.MapConfig.WALL_THICKNESS;
+import static Render3D.map.MapConfig.WALL_HEIGHT;
+import static Render3D.map.MapConfig.WALL_CENTER_Y;
+import static Render3D.map.MapConfig.WALL_JOIN_OVERLAP;
+import static Render3D.map.MapConfig.FLOOR_THICKNESS;
+import static Render3D.map.MapConfig.TEXTURE_SCALE;
+import static Render3D.map.MapConfig.ITEM_SIZE;
+import static Render3D.map.MapConfig.ITEM_FLOAT_HEIGHT;
+import static Render3D.map.MapConfig.ITEM_SPIN_SPEED;
+import static Render3D.map.MapConfig.ITEM_PICKUP_RADIUS;
+import static Render3D.map.MapConfig.SPAWN_HEIGHT;
+import static Render3D.map.MapConfig.WINDOW_SILL_HEIGHT;
+import static Render3D.map.MapConfig.WINDOW_HEADER_HEIGHT;
+import static Render3D.map.MapConfig.DOOR_HEADER_HEIGHT;
+import static Render3D.map.MapConfig.RAILING_HEIGHT;
+import static Render3D.map.MapConfig.RAILING_THICKNESS;
 
 /**
  * Renderizador de mazmorras a partir de un mapa de texto.
@@ -16,20 +37,38 @@ import java.util.List;
  * (ver {@link #applyLayout}) dejando abierta la puerta a futuras mecánicas de
  * cambio de escenario.
  *
- * Tabla de símbolos (ver {@link SymbolType}):
- *   '▓'  muro horizontal (se fusiona en patrones)
- *   '■'  muro vertical (se fusiona en patrones)
+ * Todo lo editable de la mazmorra (constantes, símbolos y el nivel de ejemplo)
+ * vive en UN solo lugar: {@link MapConfig}. <b>Para cambiar el mapa se toca
+ * ahí</b>; esta clase solo construye la geometría a partir de esa
+ * configuración.
+ *
+ * Tabla de símbolos (ver {@link MapConfig.SymbolType}):
+ *   '■'  muro horizontal (se fusiona en patrones)
+ *   '◙'  muro vertical (se fusiona en patrones)
  *   '▣'  ventana (ver {@link Window})
  *   '◧'  puerta (ver {@link Door})
- *   '░'  piso y techo: dos paneles texturizados (abajo y arriba)
+ *   '◫'  piso y techo: dos paneles texturizados (abajo y arriba)
+ *   '▒'  piso sin techo: solo panel inferior (pasillos abiertos / puentes)
+ *   '◰'  railing: tramo de piso SIN techo con DOS muros bajos y finos
+ *        ({@link MapConfig#RAILING_THICKNESS}) en sus bordes largos: una barra
+ *        continua por segmento, extendida hasta los muros/puertas, más un
+ *        colisionador oculto a toda altura para que el jugador no se pase (ver
+ *        {@link Railing}); sus colisiones van en lista aparte
  *   '◈'  item: un cubo que flota a la altura de la cámara, rota y brilla
  *        ligeramente; desaparece si el jugador pasa por su punto
- *   '▵'/'▿'/'▹'/'◃'  spawn del jugador: la flecha indica hacia dónde mira
+ *   '▲'/'▼'/'▶'/'◀'  spawn del jugador: la flecha indica hacia dónde mira
  *   '□'/' '  vacío: no se construye nada (fácil de editar)
  *
+ * Pisos y techos inteligentes: cada región conexa (celdas de '◫'/'▒'
+ * adyacentes por sus 4 lados, sin importar los muros) calcula su propio primer
+ * y último; no hay un recuadro global. El techo solo aparece sobre celdas de
+ * '◫', así que un pasillo o puente de '▒'/'◰' entre dos cuartos queda abierto
+ * arriba.
+ *
  * Las alturas de aberturas y el cruce de muros se ajustan desde las constantes
- * de esta clase ({@link #WINDOW_SILL_HEIGHT}, {@link #WINDOW_HEADER_HEIGHT},
- * {@link #DOOR_HEADER_HEIGHT}, {@link #WALL_JOIN_OVERLAP}).
+ * de {@link MapConfig} ({@link MapConfig#WINDOW_SILL_HEIGHT},
+ * {@link MapConfig#WINDOW_HEADER_HEIGHT}, {@link MapConfig#DOOR_HEADER_HEIGHT},
+ * {@link MapConfig#WALL_JOIN_OVERLAP}).
  *
  * Alineación flexible de ventanas y puertas: se recorren los 4 vecinos (N, S,
  * E, O) y se usa la orientación del PRIMER muro encontrado ('▓' -> horizontal,
@@ -40,13 +79,13 @@ import java.util.List;
  * Spawn único: si hay más de un spawn, se borra el anterior encontrado y se
  * cambia por piso ('░'); permanece el último.
  *
- * Editar un símbolo = editar una línea de {@code SymbolType} (carácter).
+ * Editar un símbolo = editar una línea de {@link MapConfig.SymbolType}.
  * Editar las alturas de ventanas/puertas = editar {@link Window} / {@link Door}.
  * Para cambiar el comportamiento de todos los símbolos se toca un solo punto.
  *
  * Intersección de muros: los extremos de cada muro se extienden hasta el eje
  * de la pared perpendicular para cerrar las esquinas sin huecos hacia afuera.
- * El cruce se limita a un solapamiento mínimo ({@link #WALL_JOIN_OVERLAP}) en
+ * El cruce se limita a un solapamiento mínimo ({@link MapConfig#WALL_JOIN_OVERLAP}) en
  * la cara de la pared perpendicular, de modo que no se noten ambos muros
  * atravesándose. Un muro horizontal, cuando no tiene otro '▓' a su costado,
  * verifica si hay un '■' abajo (o arriba) y se intersecta con él; un muro
@@ -54,34 +93,14 @@ import java.util.List;
  */
 public class DungeonManager {
 
-    // Geometría editable de la mazmorra.
-    public static final float CELL_SIZE = 4.0f;
-    public static final float WALL_THICKNESS = 1.0f;
-    public static final float WALL_HEIGHT = 8.0f;
-    public static final float WALL_CENTER_Y = WALL_HEIGHT / 2f;
-    public static final float TEXTURE_SCALE = 4.0f;
-
-    public static final float FLOOR_THICKNESS = 0.4f;
-    public static final float ITEM_SIZE = 0.8f;
-    public static final float ITEM_FLOAT_HEIGHT = 3.0f; // altura de la cámara
-    public static final float ITEM_SPIN_SPEED = 1.5f;   // rad/seg
-    public static final float ITEM_PICKUP_RADIUS = 1.5f;
-    public static final float SPAWN_HEIGHT = 3.0f;
-
-    // Aberturas: UN solo lugar para ajustar ventanas y puertas.
-    public static final float WINDOW_SILL_HEIGHT = 2.0f;   // pared inferior de la ventana
-    public static final float WINDOW_HEADER_HEIGHT = 5.6f; // pared superior de la ventana
-    public static final float DOOR_HEADER_HEIGHT = 5.6f;   // hueco de la puerta: un poco sobre la cámara
-
-    // Cruce mínimo de muros en las esquinas: sella sin que se vean cruzados.
-    public static final float WALL_JOIN_OVERLAP = 0.1f;
-
     private final List<Wall> walls = new ArrayList<>();
     private final List<Wall> windowPanels = new ArrayList<>();
     private final List<Wall> windowColliders = new ArrayList<>();
     private final List<Wall> doorPanels = new ArrayList<>();
     private final List<Wall> floorsAndCeilings = new ArrayList<>();
+    private final List<Railing> railings = new ArrayList<>();
     private final List<Item> items = new ArrayList<>();
+    private int totalItems = 0;
     private Vector3f spawnPosition;
     private float spawnYaw = -90f;
 
@@ -107,21 +126,10 @@ public class DungeonManager {
     }
 
 /**
-     * Nivel de ejemplo: un cuarto cerrado con una ventana '▣' en el muro norte,
-     * una ventana vertical '▣' en el muro este y una puerta '◧' en el muro sur,
-     * piso y techo ('░'), el spawn ('▿' = el jugador mira al sur) y un item
-     * ('◈') que recoger.
+     * Nivel de ejemplo (ver {@link MapConfig#sampleLayout()}).
      */
     public static String[] sampleLayout() {
-        return new String[] {
-            "■■▣▣■▣▣■◙■▣■◙■■◙",
-            "◙◫◫◫◙◫◫◫◧◫◫◫◧◫◫◙",
-            "◙▶◫◫▣◫◈◫◙■▣■◙◫◫◙",
-            "◙◫◫◫◙◫◫◫◙□□□◙◫◫◙",
-            "◙■◧■■■◧■◙■◧■◙◫◫◙",
-            "◙◫◈◫◈◫◈◫◧◫◫◫◫◫◫◙",
-            "◙■▣▣▣▣▣■◙■■■◙■▣■",
-        };
+        return MapConfig.sampleLayout();
     }
 
     private void build(char[][] layout, int wallTexture, int floorTexture, int ceilingTexture) {
@@ -132,9 +140,12 @@ public class DungeonManager {
 
         buildHorizontalCells(layout, originX, originZ, wallTexture);
         buildVerticalCells(layout, originX, originZ, wallTexture);
+        buildRailings(layout, originX, originZ, wallTexture);
         buildOpenings(layout, originX, originZ, wallTexture);
-        buildRooms(layout, originX, originZ, floorTexture, ceilingTexture);
+        buildFloorsAndCeilings(layout, originX, originZ, floorTexture, ceilingTexture);
+        buildRailingFloors(layout, originX, originZ, floorTexture);
         buildItems(layout, originX, originZ, wallTexture);
+        totalItems = items.size();
         spawnPosition = findSpawn(layout, originX, originZ);
     }
 
@@ -292,18 +303,50 @@ public class DungeonManager {
         return false;
     }
 
-    // Regiones cerradas de '░' que representan cuartos. Cada grupo de '░' se
-    // conecta por sus 4 lados y se expande hasta que a la derecha o abajo ya
-    // no hay '░'. El piso y el techo se pintan como un cuadrado entre el '░'
-    // más alto e izquierdo y el '░' más bajo y derecho del grupo.
-    private void buildRooms(char[][] layout, float originX, float originZ, int floorTexture, int ceilingTexture) {
+    /**
+     * Pisos y techos inteligentes: dos pasadas independientes sobre regiones
+     * conexas (celdas adyacentes por sus 4 lados, sin importar si hay muro,
+     * agrupando solo celdas del mismo grupo de piso):
+     *
+     *   - PISOS: agrupa '◫' y '▒' (cualquier celda transitable EXCEPTO '◰').
+     *     Cada región dibuja UN panel inferior con su caja contenedora exacta.
+     *     El '◰' se excluye porque su piso es por celda ({@link
+     *     #buildRailingFloors}), independiente de la región, para no tapar los
+     *     huecos '□' que lo rodean.
+     *   - TECHOS: agrupa solo '◫' (piso con techo). Las celdas de '▒'/'◰' (piso
+     *     sin techo) NUNCA suman a un techo: un pasillo o puente entre dos
+     *     cuartos queda abierto arriba.
+     *
+     * Así cada cuarto calcula su propio primer/último (expansión conexa) y no
+     * hay un único recuadro global para todo el mapa.
+     */
+    private void buildFloorsAndCeilings(char[][] layout, float originX, float originZ,
+                                        int floorTexture, int ceilingTexture) {
+        buildRegionQuads(layout, originX, originZ, floorTexture, ceilingTexture,
+                type -> type.isWalkable() && type != SymbolType.RAILING, true, false);
+        buildRegionQuads(layout, originX, originZ, floorTexture, ceilingTexture,
+                type -> type == SymbolType.FLOOR_CEILING, false, true);
+    }
+
+    /**
+     * Expande una región conexa (4 vecinos) de celdas que cumplen {@code member}
+     * y construye un panel por región. La expansión se hace solo con celdas
+     * directamente adyacentes del mismo miembro (no depende de muros), como el
+     * recorrido "serpiente" clásico pero en una sola pasada y con el resultado
+     * exacto: el primer/último de cada habitación se obtiene con una BFS que
+     * toca solo las celdas de la región.
+     */
+    private void buildRegionQuads(char[][] layout, float originX, float originZ,
+                                  int floorTexture, int ceilingTexture,
+                                  java.util.function.Predicate<SymbolType> member,
+                                  boolean emitFloor, boolean emitCeiling) {
         int rows = layout.length;
         int cols = layout[0].length;
         boolean[][] visited = new boolean[rows][cols];
 
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
-                if (SymbolType.fromChar(layout[r][c]) != SymbolType.FLOOR_CEILING || visited[r][c]) {
+                if (!member.test(SymbolType.fromChar(layout[r][c])) || visited[r][c]) {
                     continue;
                 }
                 int top = r, bottom = r, left = c, right = c;
@@ -320,30 +363,34 @@ public class DungeonManager {
                     left = Math.min(left, cc);
                     right = Math.max(right, cc);
 
-                    visitNeighbor(layout, visited, queue, cr - 1, cc);
-                    visitNeighbor(layout, visited, queue, cr + 1, cc);
-                    visitNeighbor(layout, visited, queue, cr, cc - 1);
-                    visitNeighbor(layout, visited, queue, cr, cc + 1);
+                    visitRegionNeighbor(layout, visited, queue, cr - 1, cc, member);
+                    visitRegionNeighbor(layout, visited, queue, cr + 1, cc, member);
+                    visitRegionNeighbor(layout, visited, queue, cr, cc - 1, member);
+                    visitRegionNeighbor(layout, visited, queue, cr, cc + 1, member);
                 }
 
-                addRoomFloorAndCeiling(left, right, top, bottom, originX, originZ, floorTexture, ceilingTexture);
+                addRegionFloorAndCeiling(left, right, top, bottom, originX, originZ,
+                        floorTexture, ceilingTexture, emitFloor, emitCeiling);
             }
         }
     }
 
-    private void visitNeighbor(char[][] layout, boolean[][] visited, ArrayDeque<int[]> queue, int r, int c) {
+    private void visitRegionNeighbor(char[][] layout, boolean[][] visited, ArrayDeque<int[]> queue,
+                                     int r, int c, java.util.function.Predicate<SymbolType> member) {
         if (r < 0 || r >= layout.length || c < 0 || c >= layout[0].length) {
             return;
         }
-        if (SymbolType.fromChar(layout[r][c]) != SymbolType.FLOOR_CEILING || visited[r][c]) {
+        SymbolType type = SymbolType.fromChar(layout[r][c]);
+        if (!member.test(type) || visited[r][c]) {
             return;
         }
         visited[r][c] = true;
         queue.add(new int[] {r, c});
     }
 
-    private void addRoomFloorAndCeiling(int left, int right, int top, int bottom,
-                                        float originX, float originZ, int floorTexture, int ceilingTexture) {
+    private void addRegionFloorAndCeiling(int left, int right, int top, int bottom,
+                                          float originX, float originZ, int floorTexture, int ceilingTexture,
+                                          boolean emitFloor, boolean emitCeiling) {
         int widthCells = right - left + 1;
         int depthCells = bottom - top + 1;
         float centerX = originX + (left + widthCells / 2f) * CELL_SIZE;
@@ -353,15 +400,231 @@ public class DungeonManager {
         float width = (widthCells + 1) * CELL_SIZE;
         float depth = (depthCells + 1) * CELL_SIZE;
 
-        Wall floor = new Wall(width, FLOOR_THICKNESS, depth, floorTexture, true);
-        floor.setPosition(centerX, FLOOR_THICKNESS / 2f, centerZ);
-        floor.setTexture(floorTexture, TEXTURE_SCALE, TEXTURE_SCALE, true);
-        floorsAndCeilings.add(floor);
+        if (emitFloor) {
+            Wall floor = new Wall(width, FLOOR_THICKNESS, depth, floorTexture, true);
+            floor.setPosition(centerX, FLOOR_THICKNESS / 2f, centerZ);
+            floor.setTexture(floorTexture, TEXTURE_SCALE, TEXTURE_SCALE, true);
+            floorsAndCeilings.add(floor);
+        }
+        if (emitCeiling) {
+            Wall ceiling = new Wall(width, FLOOR_THICKNESS, depth, ceilingTexture, true);
+            ceiling.setPosition(centerX, WALL_HEIGHT - FLOOR_THICKNESS / 2f, centerZ);
+            ceiling.setTexture(ceilingTexture, TEXTURE_SCALE, TEXTURE_SCALE, true);
+            floorsAndCeilings.add(ceiling);
+        }
+    }
 
-        Wall ceiling = new Wall(width, FLOOR_THICKNESS, depth, ceilingTexture, true);
-        ceiling.setPosition(centerX, WALL_HEIGHT - FLOOR_THICKNESS / 2f, centerZ);
-        ceiling.setTexture(ceilingTexture, TEXTURE_SCALE, TEXTURE_SCALE, true);
-        floorsAndCeilings.add(ceiling);
+    /**
+     * Piso de cada railing '◰': UN panel por CELDA, nunca un recuadro de
+     * región. Así los huecos '□' que rodean al railing quedan vacíos (no los
+     * cubre un panel global) y cada tramo se comporta de forma independiente;
+     * los tramos contiguos se tocan borde con borde, sin solaparse.
+     *
+     * La celda estira media celda SOLO hacia un vecino sólido (muro, ventana o
+     * puerta), para esconder el borde bajo él y salvar los umbrales de las
+     * puertas; nunca hacia un vacío '□', ni hacia otro '◰' (ese lado ya lo
+     * cubre el piso de la celda vecina) ni hacia el exterior del mapa.
+     */
+    private void buildRailingFloors(char[][] layout, float originX, float originZ, int floorTexture) {
+        int rows = layout.length;
+        int cols = layout[0].length;
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (!isRailingSurface(layout, r, c)) {
+                    continue;
+                }
+                float xL = originX + c * CELL_SIZE;
+                float xR = originX + (c + 1) * CELL_SIZE;
+                float zT = originZ + r * CELL_SIZE;
+                float zB = originZ + (r + 1) * CELL_SIZE;
+                if (isSolidNeighbor(layout, r, c - 1)) xL -= CELL_SIZE / 2f;
+                if (isSolidNeighbor(layout, r, c + 1)) xR += CELL_SIZE / 2f;
+                if (isSolidNeighbor(layout, r - 1, c)) zT -= CELL_SIZE / 2f;
+                if (isSolidNeighbor(layout, r + 1, c)) zB += CELL_SIZE / 2f;
+
+                Wall floor = new Wall(xR - xL, FLOOR_THICKNESS, zB - zT, floorTexture, true);
+                floor.setPosition((xL + xR) / 2f, FLOOR_THICKNESS / 2f, (zT + zB) / 2f);
+                floor.setTexture(floorTexture, TEXTURE_SCALE, TEXTURE_SCALE, true);
+                floorsAndCeilings.add(floor);
+            }
+        }
+    }
+
+    // Un vecino sólido (muro, ventana o puerta) cubre el borde del piso del
+    // railing y merece la estirada de media celda; un '□' abierto u otro '◰'
+    // (su piso ya está al lado) no debe recibirla.
+    private boolean isSolidNeighbor(char[][] layout, int r, int c) {
+        if (r < 0 || r >= layout.length || c < 0 || c >= layout[0].length) {
+            return false;
+        }
+        SymbolType type = SymbolType.fromChar(layout[r][c]);
+        return type.isSolid() && type != SymbolType.RAILING;
+    }
+
+    /**
+     * Railing ('◰'): tramo de piso SIN techo (el piso se pinta por celda, ver
+     * {@link #buildRailingFloors}) con un muro bajo de 2.0 en CADA lado que da
+     * a vacío, muro o ventana. El lado se ABRE (sin barra) cuando la celda
+     * contigua es otra superficie de railing, una puerta, un piso (con o sin
+     * techo), un spawn o un artefacto; se CIERRA (con barra) contra el vacío
+     * '□', los muros '■◙', las ventanas '▣' y el exterior del mapa.
+     *
+     * Las barras se generan por LÍNEA de borde y las celdas contiguas se
+     * fusionan en un solo Railing. Cada extremo de una barra se estira media
+     * celda hacia un piso o una puerta (el lateral se abre ahí y la barra debe
+     * conectar con la habitación sin dejar huecos); hacia otro '◰' el borde
+     * termina EXACTO en el límite compartido, sin solapes.
+     */
+    private void buildRailings(char[][] layout, float originX, float originZ, int wallTexture) {
+        int rows = layout.length;
+        int cols = layout[0].length;
+
+        // Bordes horizontales: cada línea entre la fila b-1 y la fila b. La cara
+        // sur de la fila b-1 y la cara norte de la fila b coinciden en la misma
+        // línea; nunca hay dos barras a la vez porque entre dos '◰' el lado abre.
+        for (int b = 0; b <= rows; b++) {
+            int segStart = -1;
+            for (int c = 0; c <= cols; c++) {
+                boolean bar = c < cols && horizontalBarAt(layout, b, c);
+                if (bar && segStart < 0) {
+                    segStart = c;
+                }
+                if (segStart >= 0 && !bar) {
+                    float xL = originX + segStart * CELL_SIZE;
+                    float xR = originX + c * CELL_SIZE;
+                    if (extendsHorizAt(layout, b, segStart - 1)) {
+                        xL -= CELL_SIZE / 2f;
+                    }
+                    if (extendsHorizAt(layout, b, c)) {
+                        xR += CELL_SIZE / 2f;
+                    }
+                    addRailingBar((xL + xR) / 2f, originZ + b * CELL_SIZE,
+                            xR - xL, RAILING_THICKNESS, wallTexture);
+                    segStart = -1;
+                }
+            }
+        }
+
+        // Bordes verticales: cada línea entre la columna d-1 y la columna d.
+        for (int d = 0; d <= cols; d++) {
+            int segStart = -1;
+            for (int r = 0; r <= rows; r++) {
+                boolean bar = r < rows && verticalBarAt(layout, r, d);
+                if (bar && segStart < 0) {
+                    segStart = r;
+                }
+                if (segStart >= 0 && !bar) {
+                    float zT = originZ + segStart * CELL_SIZE;
+                    float zB = originZ + r * CELL_SIZE;
+                    if (extendsVertAt(layout, segStart - 1, d)) {
+                        zT -= CELL_SIZE / 2f;
+                    }
+                    if (extendsVertAt(layout, r, d)) {
+                        zB += CELL_SIZE / 2f;
+                    }
+                    addRailingBar(originX + d * CELL_SIZE, (zT + zB) / 2f,
+                            RAILING_THICKNESS, zB - zT, wallTexture);
+                    segStart = -1;
+                }
+            }
+        }
+    }
+
+    // ¿Barra en el borde horizontal entre la fila b-1 y la b, en la columna c?
+    // Cierra si la celda railing de un lado se enfrenta a algo que NO abre el
+    // borde (vacío, muro, ventana o exterior del mapa).
+    private boolean horizontalBarAt(char[][] layout, int b, int c) {
+        return (isRailingSurface(layout, b - 1, c) && !railingOpens(layout, b, c))
+                || (isRailingSurface(layout, b, c) && !railingOpens(layout, b - 1, c));
+    }
+
+    // ¿Barra en el borde vertical entre la columna d-1 y la d, en la fila r?
+    private boolean verticalBarAt(char[][] layout, int r, int d) {
+        return (isRailingSurface(layout, r, d - 1) && !railingOpens(layout, r, d))
+                || (isRailingSurface(layout, r, d) && !railingOpens(layout, r, d - 1));
+    }
+
+    // ¿Estirar media celda el extremo de la barra horizontal de la línea b hacia
+    // la columna c (justo fuera del tramo)? Solo hacia un PISO (con o sin techo)
+    // o una PUERTA, donde el lateral se ABRE: así la barra llega a la habitación
+    // sin dejar huecos. Si en c hay otro '◰', vacío, muro, ventana o exterior,
+    // el borde queda EXACTO en el límite (sin solapes entre railings vecinos).
+    private boolean extendsHorizAt(char[][] layout, int b, int c) {
+        if (isRailingSurface(layout, b - 1, c) || isRailingSurface(layout, b, c)) {
+            return false;
+        }
+        return isOpeningSurface(layout, b - 1, c) || isOpeningSurface(layout, b, c);
+    }
+
+    // ¿Estirar media celda el extremo de la barra vertical de la línea d hacia
+    // la fila r (justo fuera del tramo)? Misma regla que {@link #extendsHorizAt}.
+    private boolean extendsVertAt(char[][] layout, int r, int d) {
+        if (isRailingSurface(layout, r, d - 1) || isRailingSurface(layout, r, d)) {
+            return false;
+        }
+        return isOpeningSurface(layout, r, d - 1) || isOpeningSurface(layout, r, d);
+    }
+
+    // ¿La celda merece la estirada de media celda de un extremo de barra? Solo
+    // un piso ('◫'/'▒') o una puerta ('◧'): son los lados que se ABREN y donde
+    // la barra debe conectar con la habitación. Contra vacío, muro, ventana,
+    // exterior u otra superficie de railing el extremo queda exacto en su límite.
+    private boolean isOpeningSurface(char[][] layout, int r, int c) {
+        if (r < 0 || r >= layout.length || c < 0 || c >= layout[0].length) {
+            return false;
+        }
+        SymbolType type = SymbolType.fromChar(layout[r][c]);
+        return type == SymbolType.DOOR
+                || type == SymbolType.FLOOR_CEILING
+                || type == SymbolType.FLOOR_ONLY;
+    }
+
+    // Una dirección del railing se ABRE (sin barra) si la celda vecina es otra
+    // superficie de railing, una puerta, un piso (con/sin techo), un spawn o un
+    // artefacto; el vacío, el muro, la ventana y el exterior del mapa la cierran.
+    private boolean railingOpens(char[][] layout, int r, int c) {
+        if (r < 0 || r >= layout.length || c < 0 || c >= layout[0].length) {
+            return false;
+        }
+        SymbolType type = SymbolType.fromChar(layout[r][c]);
+        return type == SymbolType.RAILING
+                || type == SymbolType.DOOR
+                || type == SymbolType.FLOOR_CEILING
+                || type == SymbolType.FLOOR_ONLY
+                || type == SymbolType.ITEM
+                || type.isSpawn();
+    }
+
+    private void addRailingBar(float centerX, float centerZ, float width, float depth, int wallTexture) {
+        railings.add(new Railing(width, depth, centerX, centerZ, wallTexture));
+    }
+
+    private boolean isRailing(char[][] layout, int r, int c) {
+        if (r < 0 || r >= layout.length || c < 0 || c >= layout[0].length) {
+            return false;
+        }
+        return SymbolType.fromChar(layout[r][c]) == SymbolType.RAILING;
+    }
+
+    /**
+     * Trazo de railing: una celda '◰' o un item '◈' colocado SOBRE un railing
+     * (con al menos un vecino '◰'). El item se trata como parte del railing en
+     * la construcción del piso y las barras, para que no quede un hueco en el
+     * puente ni se corte la barandilla bajo el artefacto.
+     */
+    private boolean isRailingSurface(char[][] layout, int r, int c) {
+        if (r < 0 || r >= layout.length || c < 0 || c >= layout[0].length) {
+            return false;
+        }
+        char glyph = layout[r][c];
+        if (SymbolType.fromChar(glyph) == SymbolType.RAILING) {
+            return true;
+        }
+        if (SymbolType.fromChar(glyph) != SymbolType.ITEM) {
+            return false;
+        }
+        return isRailing(layout, r, c - 1) || isRailing(layout, r, c + 1)
+                || isRailing(layout, r - 1, c) || isRailing(layout, r + 1, c);
     }
 
     // Items: un cubo que flota a la altura de la cámara.
@@ -496,6 +759,9 @@ public class DungeonManager {
         for (Wall floorOrCeiling : floorsAndCeilings) {
             floorOrCeiling.cleanup();
         }
+        for (Railing railing : railings) {
+            railing.cleanup();
+        }
         for (Item item : items) {
             item.box.cleanup();
         }
@@ -504,6 +770,7 @@ public class DungeonManager {
         windowColliders.clear();
         doorPanels.clear();
         floorsAndCeilings.clear();
+        railings.clear();
         items.clear();
         spawnPosition = null;
     }
@@ -543,6 +810,9 @@ public class DungeonManager {
         for (Wall floorOrCeiling : floorsAndCeilings) {
             floorOrCeiling.render(shader);
         }
+        for (Railing railing : railings) {
+            railing.getWall().render(shader);
+        }
     }
 
     /** Renderiza los items con su shader propio (brillo ligero). */
@@ -570,12 +840,62 @@ public class DungeonManager {
         for (Wall panel : doorPanels) {
             collisionManager.addCollision(panel);
         }
+        // Railings: bloquean el paso como un muro (colisionador oculto a toda
+        // altura). Sus colisiones van en una lista aparte de los muros.
+        for (Railing railing : railings) {
+            collisionManager.addRailingCollision(railing.getCollider());
+        }
         // Los items no colisionan: son transitables.
     }
 
     public void cleanup() {
         freeGeometry();
         grid = null;
+    }
+
+    /** Total de items que tenía el nivel al construirse. */
+    public int getTotalItems() {
+        return totalItems;
+    }
+
+    /** Items recogidos hasta ahora = total - los que quedan en el mapa. */
+    public int getCollectedItems() {
+        return totalItems - items.size();
+    }
+
+    /** Posiciones (mundo) de los items que aún quedan en el mapa. */
+    public List<Vector3f> getItemPositions() {
+        List<Vector3f> positions = new ArrayList<>(items.size());
+        for (Item item : items) {
+            positions.add(new Vector3f(item.center));
+        }
+        return positions;
+    }
+
+    public int getRows() {
+        return grid.length;
+    }
+
+    public int getCols() {
+        return grid[0].length;
+    }
+
+    /** Tipo de celda (solo lectura). */
+    public SymbolType getCellAt(int r, int c) {
+        if (r < 0 || r >= grid.length || c < 0 || c >= grid[0].length) {
+            return SymbolType.EMPTY;
+        }
+        return SymbolType.fromChar(grid[r][c]);
+    }
+
+    /** X del borde izquierdo del mapa en el mundo. */
+    public float getOriginX() {
+        return -((float) getCols()) * CELL_SIZE / 2f;
+    }
+
+    /** Z del borde superior del mapa en el mundo. */
+    public float getOriginZ() {
+        return -((float) getRows()) * CELL_SIZE / 2f;
     }
 
     public Vector3f getSpawnPosition() {
@@ -594,84 +914,6 @@ public class DungeonManager {
         Item(Wall box, Vector3f center) {
             this.box = box;
             this.center = center;
-        }
-    }
-
-    /**
-     * ÚNICO lugar donde se declaran los símbolos del nivel: carácter, si es
-     * sólido, si se fusiona en patrones de pared, y la plantilla de abertura
-     * (ventana o puerta) si aplica. Las ventanas y puertas se alinean solas
-     * comprobando sus laterales.
-     */
-    public enum SymbolType {
-EMPTY('□', false, false, null),
-        SPAWN_N('▲', false, false, null),
-        SPAWN_S('▼', false, false, null),
-        SPAWN_E('▶', false, false, null),
-        SPAWN_W('◀', false, false, null),
-        H_WALL('■', true, true, null),
-        V_WALL('◙', true, true, null),
-        WINDOW('▣', true, false, new Window()),
-        DOOR('◧', true, false, new Door()),
-        FLOOR_CEILING('◫', false, false, null),
-        ITEM('◈', false, false, null);
-
-        private final char glyph;
-        private final boolean solid;
-        private final boolean merging;
-        private final Opening opening;
-
-        SymbolType(char glyph, boolean solid, boolean merging, Opening opening) {
-            this.glyph = glyph;
-            this.solid = solid;
-            this.merging = merging;
-            this.opening = opening;
-        }
-
-        public char glyph() {
-            return glyph;
-        }
-
-        public boolean isSolid() {
-            return solid;
-        }
-
-        public boolean isMerging() {
-            return merging;
-        }
-
-        /** Muro horizontal ('▓'); las aberturas se alinean solas. */
-        public boolean isHorizontal() {
-            return this == H_WALL;
-        }
-
-        /** Muro vertical ('■'); las aberturas se alinean solas. */
-        public boolean isVertical() {
-            return this == V_WALL;
-        }
-
-        public boolean isOpening() {
-            return this == WINDOW || this == DOOR;
-        }
-
-        public boolean isSpawn() {
-            return this == SPAWN_N || this == SPAWN_S || this == SPAWN_E || this == SPAWN_W;
-        }
-
-        public Opening opening() {
-            return opening;
-        }
-
-
-        static final SymbolType[] ALL = values();
-
-        public static SymbolType fromChar(char c) {
-            for (SymbolType type : ALL) {
-                if (type.glyph() == c) {
-                    return type;
-                }
-            }
-            return EMPTY;
         }
     }
 }
