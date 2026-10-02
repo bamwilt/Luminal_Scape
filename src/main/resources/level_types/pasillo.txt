@@ -1,0 +1,13 @@
+# Preset de nivel: pasillo largo.
+# Concreto y luz fría: la niebla tiene que comerse el fondo del pasillo, asi
+# que el cielo es casi blanco azulado y el suelo queda plano para no distraer.
+
+floor_texture: textures/Floor2.jpg
+ceiling_texture: textures/br_ceiling_tiles_2.png
+
+sky_type: gradient
+sky_speed: 0.02
+
+# Niebla palida y cenit gris: el final del pasillo se pierde en el horizonte.
+sky_horizon_color: #C9D4D8
+sky_zenith_color: #5A666C

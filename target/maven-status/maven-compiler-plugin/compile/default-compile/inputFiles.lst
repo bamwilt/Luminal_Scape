@@ -1,16 +1,54 @@
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\Button.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\Camera.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\Cube.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\Import3D.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\Main.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\maintest.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\Material.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\Mesh.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\Shader.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\ShaderProgram.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\ShaderUtils.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\TextRender.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\TextureLoader.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\Wall.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\main\Window.java
-C:\Users\Bryan Maradiaga\Documents\NetBeansProjects\pLuminalScape\src\main\java\ResourceChecker.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/MediaUtil/AudioSystem.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/MediaUtil/SoundLoader.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/MediaUtil/SoundManager.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Player/Camera.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Player/InputPlayer.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Player/MouseController.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Player/Player.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render2D/Button.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render2D/ImageQuad.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render2D/Minimap.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render2D/QuadBatch.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render2D/SharedQuadMesh.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render2D/TextRender.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render2D/UIScale.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render2D/VisionManager.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/collision/Aabb.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/collision/CollisionManager.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/graphics/GlbModel.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/graphics/Import3D.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/graphics/PropMesh.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/graphics/SkyRenderer.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/graphics/Wall.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/item/Item.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/item/ItemKey.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/item/ItemMap.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/item/ItemTime.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/Atmosphere.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/Door.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/DungeonManager.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/LevelData.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/LevelLoader.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/LevelTypePreset.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/MapConfig.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/Opening.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/PropLayout.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/Railing.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/WallAutotiler.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/map/Window.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/mesh/BlockType.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/mesh/Box.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/mesh/Mesh.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/mesh/MeshBuilder.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/mesh/UvSpace.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/Render3D/mesh/WallBitmask.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/ResourceChecker.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/UtilsRender/Countdown.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/UtilsRender/FpsCounter.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/UtilsRender/Json.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/UtilsRender/Shader.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/UtilsRender/TextureLoader.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/UtilsRender/TimeUtils.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/UtilsRender/Window.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/main/GameConfig.java
+/home/bryan/Imágenes/RESPALDO-main/Luminal_Scape/src/main/java/main/Main.java

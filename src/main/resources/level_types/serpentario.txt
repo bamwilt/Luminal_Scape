@@ -1,0 +1,13 @@
+# Preset de nivel: el serpentario.
+# Entorno calido y hostil: el cielo arde bajo, como una luz de atardecer que
+# entra por las aperturas y hace que los muros cierren el recorrido.
+
+floor_texture: textures/Floor2.jpg
+ceiling_texture: textures/br_pool_tiles.png
+wall_texture: textures/br_ceiling_tiles_2.png
+sky_type: gradient
+sky_speed: 0.06
+
+# Naranja al horizonte, rojo oscuro al cenit.
+sky_horizon_color: #D2691E
+sky_zenith_color: #3A1408
