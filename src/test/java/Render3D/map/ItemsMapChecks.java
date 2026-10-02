@@ -129,8 +129,33 @@ public final class ItemsMapChecks {
     // ---- El mapa de prueba: plano, con su '☑' y alcanzable --------------
     private static void alcanzable() throws Exception {
         System.out.println("== el mapa de prueba ==");
-        for (String nivel : new String[] { "level_01.txt", "level_02.txt", "level_03.txt" }) {
-            ok(contar(mapa(nivel), '☑') == 0, nivel + " ya no lleva '☑': ese item solo se prueba en el mapa de test");
+        // Un nivel tiene que poder terminarse con SUS llaves. Como el '☑' no
+        // cuenta para el total (ver soloLasLlavesPassen), da igual que lo lleve:
+        // lo que no puede pasar es que se quede sin llaves, o con llaves
+        // encerradas, porque entonces el contador llega a un numero que el mapa
+        // no tiene y el jugador se queda atrapado sin poder acabarlo.
+        for (String nivel : new String[] { "level_01.txt", "level_02.txt", "level_03.txt", "test_mapa.txt" }) {
+            // Las filas tienen que medir lo mismo. Si no, LevelLoader rellena
+            // las cortas con espacios y cada espacio es un EMPTY: sin muro, sin
+            // suelo y sin colision. Un muro olvidado se pierde sin avisar.
+            int[] anchos = anchosCrudos(nivel);
+            boolean recto = true;
+            for (int a : anchos) {
+                recto &= a == anchos[0];
+            }
+            ok(recto, nivel + " es un rectangulo: todas sus filas miden " + anchos[0]);
+
+            String[] filasNivel = mapa(nivel);
+            ok(contar(filasNivel, '◈') > 0, nivel + " tiene llaves con las que terminarlo");
+            boolean[][] alcanzadoNivel = alcanzable(filasNivel);
+            for (int r = 0; r < filasNivel.length; r++) {
+                for (int c = 0; c < filasNivel[r].length(); c++) {
+                    if (filasNivel[r].charAt(c) == '◈') {
+                        ok(alcanzadoNivel[r][c],
+                                nivel + ": la llave de (" + r + "," + c + ") se puede coger andando");
+                    }
+                }
+            }
         }
 
         String[] filas = mapa("test_mapa.txt");
@@ -300,6 +325,24 @@ public final class ItemsMapChecks {
         return rectas;
     }
 
+    /**
+     * Ancho de todas las filas del mapa, tal cual estan en el archivo.
+     *
+     * <p>Sin rellenar: {@link LevelLoader} rellena las filas cortas con
+     * espacios y {@code MapConfig} convierte ese espacio en {@code EMPTY}, asi
+     * que una fila que se olvida de un glifo no da error: se pierde en
+     * silencio un muro, un suelo o una ventana. Esto solo mira los anchos.
+     */
+    private static int[] anchosCrudos(String nivel) throws Exception {
+        String texto = leer("src/main/resources/levels/" + nivel);
+        String[] filas = texto.split("map:\n", 2)[1].replaceAll("\\s+$", "").split("\n");
+        int[] anchos = new int[filas.length];
+        for (int i = 0; i < filas.length; i++) {
+            anchos[i] = filas[i].length();
+        }
+        return anchos;
+    }
+
     private static int contar(String[] filas, char simbolo) {
         int n = 0;
         for (String f : filas) {
@@ -318,7 +361,11 @@ public final class ItemsMapChecks {
      * <p>Solo se pisan las celdas con suelo o con baranda: un hueco ('□') se
      * puede andar por encima porque el juego no tiene gravedad, pero no es una
      * ruta que el nivel pretenda, asi que para esto cuenta como pared. Las
-     * puertas ('◧') si se pasan.
+     * puertas ('◧') si se pasan. El espacio tambien cuenta como pared, y no
+     * solo porque suene raro: {@code MapConfig.SymbolType.fromChar(' ')} cae en
+     * el {@code default} y devuelve {@code EMPTY}, o sea que una celda de
+     * espacio no tiene ni suelo ni muro ni colision. El jugador se la puede
+     * cruzar, pero es un agujero al vacio, no una ruta del nivel.
      */
     private static boolean[][] alcanzable(String[] filas) {
         int filasN = filas.length;

@@ -127,6 +127,23 @@ public class Main {
 
     private static Vector3f lightPos = new Vector3f(GameConfig.LIGHT_X, GameConfig.LIGHT_Y, GameConfig.LIGHT_Z);
 
+    /**
+     * Partida CONGELADA con M: el juego se para y suelta el raton, pero no sale
+     * el menu.
+     *
+     * <p>Es distinto de la pausa a proposito. La pausa (P) es un estado del
+     * juego con su propia pantalla y sus botones; aqui el estado sigue siendo
+     * PLAYING y lo unico que se apaga es la simulacion, asi que el jugador ve
+     * el nivel entero tal cual estaba, sin el fondo oscurecido ni el menu
+     * encima. Es lo que hace falta cuando hay que salir a otra cosa con el
+     * raton (copiar un texto, mirar una ventana) sin perder de vista la partida
+     * ni acordarse de como iba.
+     *
+     * <p>No es un estado de {@link GameState} porque no cambia nada de como se
+     * dibuja la pantalla: se dibuja exactamente igual que en partida.
+     */
+    private static boolean frozen = false;
+
     // Estado de entrada
     private static boolean menuKeyPressed = false;
     private static boolean escKeyPressed = false;
@@ -349,6 +366,9 @@ public class Main {
 
         gameTimer = new Countdown(currentLevelTime());
         gameTimer.start();
+        // Un nivel nuevo nunca arranca congelado: si se entra aqui desde la
+        // pausa rapida, el raton tiene que volver a la partida.
+        frozen = false;
         Vector3f spawn = dungeonManager.getSpawnPosition();
         if (spawn != null) {
             player.setPosition(spawn);
@@ -366,7 +386,49 @@ public class Main {
         mouseController.setCaptured(true);
     }
 
+    /**
+     * Congela la partida y suelta el raton, sin abrir el menu.
+     *
+     * <p>Se para el tiempo y se deja de mover la camara y el jugador, asi que al
+     * volver la partida sigue exactamente donde estaba. El raton se suelta para
+     * que el jugador pueda salir a otra ventana; la pantalla no cambia, porque el
+     * estado sigue siendo PLAYING (ver {@link #frozen}).
+     */
+    private static void freezeGame() {
+        if (gameTimer != null) {
+            gameTimer.pause();
+        }
+        frozen = true;
+        mouseController.setCaptured(false);
+    }
+
+    /** Quita el congelado: el tiempo y el raton vuelven como estaban. */
+    private static void unfreezeGame() {
+        // Sin este caso, si el jugador congela justo cuando el tiempo se
+        // acababa, al volver seguiria con la partida perdida congelada y el
+        // "SE ACABO EL TIEMPO" saltaria tarde. Con el, reanudar lleva al
+        // siguiente nivel igual que hace "Continuar" tras la derrota.
+        if (gameTimer != null && gameTimer.isFinished()) {
+            frozen = false;
+            if (levelIndex >= levelFiles.length - 1) {
+                endGame();
+            } else {
+                stepLevel(1);
+                startGame();
+            }
+            return;
+        }
+        if (gameTimer != null) {
+            gameTimer.resume();
+        }
+        frozen = false;
+        mouseController.setCaptured(true);
+    }
+
     private static void pauseGame() {
+        // Si se abre el menu desde una partida congelada, el menu manda: al
+        // reanudar se vuelve a partida normal, no a la congelada.
+        frozen = false;
         if (gameTimer != null) {
             gameTimer.pause();
         }
@@ -389,6 +451,7 @@ public class Main {
         if (gameTimer != null) {
             gameTimer.resume();
         }
+        frozen = false;
         state = GameState.PLAYING;
         mouseController.setCaptured(true);
     }
@@ -588,17 +651,22 @@ public class Main {
     private static void handleInput() {
         long handle = window.getWindowHandle();
 
+        // M congela la partida y suelta el raton, sin abrir el menu: el nivel se ve
+        // entero y al volver a pulsarlo sigue donde estaba. La pausa con menu es
+        // la P de abajo.
         boolean mPressed = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_M) == GLFW.GLFW_PRESS;
         if (mPressed && !menuKeyPressed) {
             if (state == GameState.PLAYING) {
-                pauseGame();
-            } else if (state == GameState.PAUSED) {
-                resumeGame();
+                if (frozen) {
+                    unfreezeGame();
+                } else {
+                    freezeGame();
+                }
             }
         }
         menuKeyPressed = mPressed;
 
-        // P también pausa/libera el mouse (y reanuda). ESC está reservado.
+        // P pausa/libera el mouse (y reanuda). ESC está reservado.
         boolean pPressed = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_P) == GLFW.GLFW_PRESS;
         if (pPressed && !escKeyPressed) {
             if (state == GameState.PLAYING) {
@@ -678,12 +746,17 @@ public class Main {
     private static void update() {
         float deltaTime = TimeUtils.getDeltaTime();
         elapsedTime += deltaTime;
-        // Los pasos solo suenan mientras la partida está activa.
-        float playerSpeed = (state == GameState.PLAYING && gameTimer != null && !gameTimer.isFinished())
+        // Los pasos solo suenan mientras la partida está activa (y no congelada: si el
+        // juego esta parado, el jugador tampoco esta caminando).
+        float playerSpeed = (state == GameState.PLAYING && !frozen
+                && gameTimer != null && !gameTimer.isFinished())
                 ? player.getVelocity().length() : 0f;
         audioSystem.update(deltaTime, playerSpeed);
 
-        if (state == GameState.PLAYING) {
+        // Con la partida congelada la pantalla se sigue dibujando, pero aqui no se
+        // simula nada: ni camara, ni jugador, ni recogida de items. El tiempo ya
+        // esta parado desde freezeGame.
+        if (state == GameState.PLAYING && !frozen) {
             mouseController.update();
             inputPlayer.update(deltaTime);
             Item picked = dungeonManager.update(player.getPosition(), deltaTime);
@@ -965,7 +1038,11 @@ public class Main {
         y += HUD_LINE_GAP;
         drawTimer(margin, y);
 
-        String hints = "Presiona M para abrir el menu";
+        // Al jugar solo se anuncia la P, que es la pausa de verdad. La M es un
+        // atajo propio: congela y suelta el raton sin menu, asi que no ocupa la
+        // pantalla con un aviso. Si se perdia y no hacia nada, la unica pista
+        // esta en el menu de pausa.
+        String hints = "P para el menu";
         textRenderer.renderer(hints, w - textRenderer.getTextWidth(hints) - margin, margin, 1f, 1f, 1f);
 
         drawToast(w, h);
@@ -1004,10 +1081,11 @@ public class Main {
         buttonReiniciar.draw(w, h, window.getWindowHandle());
 
         // La pista de controles se parte en dos lineas porque en una sola no
-        // cabia en pantallas estrechas y se salia del borde.
+        // cabia en pantallas estrechas y se salia del borde. Aqui si aparece la
+        // M, que es donde se puede echar la mano sin que estorbe jugando.
         centeredText(w, "WASD - Moverse | Q / E - Girar camara | Mouse - Mirar | Shift - Correr",
                 h * 0.82f, 1f, 1f, 1f);
-        centeredText(w, "Ctrl - Agacharse | M / P - Menu | 8 / 9 / 0 - Efectos",
+        centeredText(w, "Ctrl - Agacharse | P - Menu | M - Libera raton | 8 / 9 / 0 - Efectos",
                 h * 0.86f, 0.8f, 0.8f, 0.8f);
     }
 
@@ -1036,7 +1114,7 @@ public class Main {
 
         centeredText(w, "Presiona ENTER para jugar | < > para elegir nivel",
                 diffY + 70f, 1f, 1f, 1f);
-        centeredText(w, "WASD - Moverse | Mouse - Rotar cam | M/P - Menu | Ctrl - Agacharse | Shift - Correr",
+        centeredText(w, "WASD - Moverse | Mouse - Rotar cam | P - Menu | Shift - Correr",
                 h * 0.90f, 1f, 1f, 1f);
     }
 
