@@ -1,6 +1,6 @@
 package Render3D.map;
 
-import Render3D.graphics.Wall;
+import Render3D.mesh.Box;
 
 /**
  * Railing: una barra de muro bajo (a la altura de un pasamanos) sobre el borde
@@ -12,40 +12,27 @@ import Render3D.graphics.Wall;
  * bordes largos (ver {@link DungeonManager#buildRailings}); se construye UNA
  * barra continua por segmento, extendida hasta los muros/puertas del cuarto.
  *
- * La barra visible NO llega a los pies del jugador, así que para que no se pase
- * se registra además un COLISIONADOR OCULTO a toda altura (como un muro
- * normal) con el MISMO contorno en planta ({@link #getCollider()}). Sus
- * colisiones van en la lista aparte del gestor de colisiones.
+ * <p>La barra visible NO llega a los pies del jugador, así que para que no se
+ * pase existe además un COLISIONADOR OCULTO a toda altura (como un muro normal)
+ * con el MISMO contorno en planta ({@link #colliderBox}). Sus colisiones van en
+ * la lista aparte del gestor de colisiones.
+ *
+ * <p>Ambas son cajas en coordenadas de mundo: la barra entra en la malla
+ * batcheada de la mazmorra (compartiendo sistema de coordenadas, la textura
+ * continúa sin costuras) y el colisionador solo aporta su {@code Aabb}.
  */
-public class Railing {
+public final class Railing {
 
-    private final Wall wall;
-    private final Wall collider;
-
-    public Railing(float width, float depth, float centerX, float centerZ, int texture) {
-        wall = new Wall(width, MapConfig.RAILING_HEIGHT, depth, texture, true);
-        wall.setPosition(centerX, MapConfig.RAILING_HEIGHT / 2f, centerZ);
-        wall.setTexture(texture, MapConfig.TEXTURE_SCALE,
-                MapConfig.TEXTURE_SCALE, true);
-
-        collider = new Wall(width, MapConfig.WALL_HEIGHT, depth, texture, true);
-        collider.setPosition(centerX, MapConfig.WALL_CENTER_Y, centerZ);
-        collider.setTexture(texture, MapConfig.TEXTURE_SCALE,
-                MapConfig.TEXTURE_SCALE, true);
+    private Railing() {
     }
 
     /** Barra visible, baja (no colisiona). */
-    public Wall getWall() {
-        return wall;
+    public static Box barBox(float width, float depth, float centerX, float centerZ) {
+        return Box.centeredOnFloor(centerX, 0f, centerZ, width, MapConfig.RAILING_HEIGHT, depth);
     }
 
-    /** Colisionador oculto a toda altura, con el mismo contorno en planta. */
-    public Wall getCollider() {
-        return collider;
-    }
-
-    public void cleanup() {
-        wall.cleanup();
-        collider.cleanup();
+    /** Colisionador invisible a toda altura, con el mismo contorno en planta. */
+    public static Box colliderBox(float width, float depth, float centerX, float centerZ) {
+        return Box.centeredOnFloor(centerX, 0f, centerZ, width, MapConfig.WALL_HEIGHT, depth);
     }
 }

@@ -155,4 +155,28 @@ public class Shader {
             glUniform2f(location, x, y);
         }
     }
+
+    /**
+     * Vuelca un array de vec3 a un uniform declarado como {@code uniform vec3
+     * nombre[N]}. Los tres floats de cada luz van seguidos en {@code values}, y
+     * solo se mandan las {@code count} primeras.
+     *
+     * <p>Existe para las luces puntuales: son un numero variable segun lo cerca
+     * que este el jugador, y mandarlas una a una con {@link #setVec3} seria una
+     * busqueda de localizacion por luz y por frame.
+     */
+    public void setVec3Array(String name, float[] values, int count) {
+        if (count <= 0) {
+            return;
+        }
+        int location = glGetUniformLocation(programId, name);
+        if (location == -1) {
+            return;
+        }
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            FloatBuffer buffer = stack.mallocFloat(count * 3);
+            buffer.put(values, 0, count * 3).flip();
+            glUniform3fv(location, buffer);
+        }
+    }
 }

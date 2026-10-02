@@ -13,6 +13,15 @@ public class Button {
     private int width, height;
     private int windowWidth;
     private int windowHeight;
+    /**
+     * Píxeles de ventana por unidad de interfaz ({@link UIScale}).
+     *
+     * <p>El botón se mide y se coloca en unidades virtuales, pero el ratón
+     * llega en píxeles reales: sin esta escala el clic se compararía contra
+     * un rectángulo virtual y a los botones les faltaría un factor de ancho y
+     * alto por el lado que se agranda.
+     */
+    private float uiScale = 1f;
     private float cornerRadius = 14f;
     private String text;
     private final TextRender textRenderer;
@@ -47,6 +56,14 @@ public class Button {
         }
     }
 
+    /**
+     * Factor de {@link UIScale} de la ventana. Lo llama Main al crear los
+     * botones y cada vez que se redimensiona.
+     */
+    public void setScale(float escala) {
+        this.uiScale = escala > 0f ? escala : 1f;
+    }
+
     public void updatePosition(int windowWidth, int windowHeight) {
         this.windowWidth = windowWidth;
         this.windowHeight = windowHeight;
@@ -71,10 +88,8 @@ public class Button {
         GL11.glEnable(GL11.GL_BLEND);
         GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
 
-        double[] mx = new double[1], my = new double[1];
-        glfwGetCursorPos(windowHandle, mx, my);
-        int mouseX = (int) mx[0];
-        int mouseY = (int) my[0];
+        int mouseX = mouseVirtualX(windowHandle);
+        int mouseY = mouseVirtualY(windowHandle);
         boolean hovered = isInside(mouseX, mouseY);
 
         if (!enabled) {
@@ -89,8 +104,13 @@ public class Button {
 
         sharedMesh.draw(x, y, width, height, windowWidth, windowHeight, currentColor, cornerRadius);
 
-        float textX = x + (width * 0.5f) - (textRenderer.getTextWidth(text) / 2f);
-        float textY = y + height - (textRenderer.getTextHeight(text));
+        // El texto va centrado en las dos direcciones. Antes se anclaba al
+        // borde superior del boton (y + height - alto), asi que el rotulo
+        // rozaba el borde de arriba y el hueco de abajo parecia un error de
+        // alineacion. Centrado, el margen queda repartido y el boton se lee
+        // como un boton.
+        float textX = x + (width - textRenderer.getTextWidth(text)) / 2f;
+        float textY = y + (height - textRenderer.getTextHeight(text)) / 2f;
         textRenderer.renderer(
                 text,
                 textX,
@@ -105,10 +125,8 @@ public class Button {
     }
 
     public void handleMouseEvent(long windowHandle) {
-        double[] mx = new double[1], my = new double[1];
-        glfwGetCursorPos(windowHandle, mx, my);
-        int mouseX = (int) mx[0];
-        int mouseY = (int) my[0];
+        int mouseX = mouseVirtualX(windowHandle);
+        int mouseY = mouseVirtualY(windowHandle);
 
         int leftButtonState = glfwGetMouseButton(windowHandle, GLFW_MOUSE_BUTTON_LEFT);
         if (leftButtonState == GLFW_PRESS && isInside(mouseX, mouseY)) {
@@ -191,12 +209,36 @@ public class Button {
         return height;
     }
 
+    /** X en unidades de interfaz, ya calculada con el ultimo resize. */
+    public int getX() {
+        return x;
+    }
+
+    /** Y en unidades de interfaz, ya calculada con el ultimo resize. */
+    public int getY() {
+        return y;
+    }
+
     public void setCornerRadius(float cornerRadius) {
         this.cornerRadius = cornerRadius;
     }
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    /** X del ratón en unidades de interfaz (el GLFW da píxeles de ventana). */
+    private int mouseVirtualX(long windowHandle) {
+        double[] mx = new double[1];
+        glfwGetCursorPos(windowHandle, mx, null);
+        return (int) (mx[0] / uiScale);
+    }
+
+    /** Y del ratón en unidades de interfaz. */
+    private int mouseVirtualY(long windowHandle) {
+        double[] my = new double[1];
+        glfwGetCursorPos(windowHandle, null, my);
+        return (int) (my[0] / uiScale);
     }
 
     public boolean isInside(int mouseX, int mouseY) {

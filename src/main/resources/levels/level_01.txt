@@ -1,5 +1,8 @@
+level_type: backrooms
 name: atrapado
 time: 00:30
+ambient_light: dim
+view_distance: normal
 map:
 ◙■▣■■□□□■■▣■◙
 ▣◫◫◫◙□□□◙◫◫◫▣

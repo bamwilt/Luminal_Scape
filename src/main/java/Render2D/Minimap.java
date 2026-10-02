@@ -12,8 +12,9 @@ import java.util.ArrayDeque;
  * items restantes como puntos amarillos y el jugador como un triángulo cyan
  * que apunta a su dirección (usa el "front" de la cámara).
  *
- * El tamaño máximo del mapa es configurable ({@link #getSizePx()} /
- * {@link #setSizePx}) desde un menú (botones [-]/[+]).
+ * El tamaño no se elige a mano: sale de la pantalla (una fracción del lado
+ * menor) para que ocupe siempre el mismo lugar visible, y por eso el botón de
+ * tamaño que había en el menú de pausa ya no hace falta.
  *
  * No dibuja por sí mismo: añade primitivas al {@link QuadBatch} compartido que
  * Main se encarga de renderizar una vez por frame.
@@ -23,12 +24,20 @@ public class Minimap {
     private final DungeonManager dungeon;
     private boolean visible = false;
 
-    private float sizePx = 260f;
+    /** Fracción del lado menor de la pantalla que ocupa el mapa. */
+    private static final float SCREEN_RATIO = 0.26f;
     private static final float MIN_SIZE = 90f;
-    private static final float MAX_SIZE = 260f;
-    private static final float STEP = 15f;
+    private static final float MAX_SIZE = 300f;
 
     private final float margin = 12f;
+
+    /**
+     * Cuando es {@code true} se dibuja todo el nivel, no solo lo que ronda a
+     * los artefactos. Lo activa {@link #revealAll()}, que es lo que pasa al
+     * recoger el item de mapa (y al empezar en fácil, donde ya se trae el mapa
+     * de serie).
+     */
+    private boolean revealedAll = false;
 
     /** Vecinos a explorar (8 direcciones) alrededor de cada item. */
     private static final int[][] DIRS = {
@@ -48,24 +57,49 @@ public class Minimap {
         this.visible = visible;
     }
 
-    public void toggle() {
-        visible = !visible;
+    /**
+     * Revela el plano completo y muestra el minimapa.
+     *
+     * <p>Un mapa sirve justo para eso: al recogerlo se ve la planta entera del
+     * nivel, no un cacho alrededor de un punto. Va pegado con
+     * {@link #setVisible(boolean)} porque reveals tiene sentido, pero un
+     * minimapa escondido no aporta nada.
+     */
+    public void revealAll() {
+        this.revealedAll = true;
+        this.visible = true;
     }
 
-    public float getSizePx() {
-        return sizePx;
+    /** Si el plano completo está revelado (item de mapa o dificultad fácil). */
+    public boolean isRevealedAll() {
+        return revealedAll;
     }
 
-    public void setSizePx(float sizePx) {
-        this.sizePx = Math.max(MIN_SIZE, Math.min(MAX_SIZE, sizePx));
+    /**
+     * Deja el minimapa como recién creado: apagado y sin nada revelado.
+     *
+     * <p>Se llama al cargar cada nivel, y no solo al empezar la partida. El
+     * plano de un nivel no sirve de nada en el siguiente: las habitaciones son
+     * distintas, y sin esto el mapa recogido en el nivel 2 se seguia viendo
+     * entero en el 3 y el jugador se lo ahorraba. El item de mapa vale una vez
+     * por nivel, igual que el tiempo.
+     */
+    public void reset() {
+        this.revealedAll = false;
+        this.visible = false;
     }
 
-    public void grow() {
-        setSizePx(sizePx + STEP);
-    }
-
-    public void shrink() {
-        setSizePx(sizePx - STEP);
+    /**
+     * Lado del mapa en unidades de interfaz, para esta pantalla.
+     *
+     * <p>Se deriva del lado menor con {@link #SCREEN_RATIO} y se recorta entre
+     * {@link #MIN_SIZE} y {@link #MAX_SIZE}: en una ventana baja el mapa
+     * encoge con ella en vez de comerse medio escenario, y en una muy ancha no
+     * se convierte en un mural.
+     */
+    private float sizePx(int screenWidth, int screenHeight) {
+        float lado = Math.min(screenWidth, screenHeight) * SCREEN_RATIO;
+        return Math.max(MIN_SIZE, Math.min(MAX_SIZE, lado));
     }
 
     public void draw(QuadBatch batch, int screenWidth, int screenHeight,
@@ -79,6 +113,7 @@ public class Minimap {
             return;
         }
 
+        float sizePx = sizePx(screenWidth, screenHeight);
         float cellPx = Math.min(sizePx / cols, sizePx / rows);
         float mapW = cols * cellPx;
         float mapH = rows * cellPx;
@@ -98,9 +133,16 @@ public class Minimap {
         // item, la búsqueda continúa desde ese segundo item.
         boolean[][] revealed = new boolean[rows][cols];
         ArrayDeque<int[]> queue = new ArrayDeque<>();
+        if (revealedAll) {
+            for (int r = 0; r < rows; r++) {
+                for (int c = 0; c < cols; c++) {
+                    revealed[r][c] = true;
+                }
+            }
+        }
         for (Vector3f item : dungeon.getItemPositions()) {
-            int ir = (int) Math.floor((item.z - dungeon.getOriginZ()) / MapConfig.CELL_SIZE);
-            int ic = (int) Math.floor((item.x - dungeon.getOriginX()) / MapConfig.CELL_SIZE);
+            int ir = (int) Math.floor((item.z - dungeon.getOriginZ()) / MapConfig.TILE_SIZE);
+            int ic = (int) Math.floor((item.x - dungeon.getOriginX()) / MapConfig.TILE_SIZE);
             if (ir >= 0 && ir < rows && ic >= 0 && ic < cols && !revealed[ir][ic]) {
                 revealed[ir][ic] = true;
                 queue.add(new int[] {ir, ic});
@@ -157,8 +199,8 @@ public class Minimap {
 
         // Items restantes: puntos amarillos brillantes.
         for (Vector3f item : dungeon.getItemPositions()) {
-            float relR = (item.z - dungeon.getOriginZ()) / MapConfig.CELL_SIZE;
-            float relC = (item.x - dungeon.getOriginX()) / MapConfig.CELL_SIZE;
+            float relR = (item.z - dungeon.getOriginZ()) / MapConfig.TILE_SIZE;
+            float relC = (item.x - dungeon.getOriginX()) / MapConfig.TILE_SIZE;
             batch.addQuadCentered(
                     px + (relC + 0.5f) * cellPx,
                     py + (relR + 0.5f) * cellPx,
@@ -167,8 +209,8 @@ public class Minimap {
         }
 
         // Jugador: punto + flecha de dirección.
-        float relR = (playerPos.z - dungeon.getOriginZ()) / MapConfig.CELL_SIZE;
-        float relC = (playerPos.x - dungeon.getOriginX()) / MapConfig.CELL_SIZE;
+        float relR = (playerPos.z - dungeon.getOriginZ()) / MapConfig.TILE_SIZE;
+        float relC = (playerPos.x - dungeon.getOriginX()) / MapConfig.TILE_SIZE;
         if (relR < -0.5f || relR > rows + 0.5f || relC < -0.5f || relC > cols + 0.5f) {
             return;
         }

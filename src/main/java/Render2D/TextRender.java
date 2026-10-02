@@ -84,9 +84,14 @@ public class TextRender {
     }
 
     public void rendererRelativo(String texto, float relX, float relY, float r, float g, float b) {
+        rendererRelativo(texto, relX, relY, r, g, b, 1f);
+    }
+
+    public void rendererRelativo(String texto, float relX, float relY,
+                                 float r, float g, float b, float alpha) {
         float x = relX * windowWidth;
         float y = relY * windowHeight;
-        renderer(texto, x, y, r, g, b);
+        renderer(texto, x, y, r, g, b, alpha);
     }
 
     public void renderer(String texto, float x, float y, float r, float g, float b) {

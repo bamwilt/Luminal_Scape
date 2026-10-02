@@ -16,12 +16,17 @@ import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import org.joml.Vector3f;
+
 /**
  * Cargador de niveles desde archivos de texto en recursos (carpeta
  * {@code levels/}). Cada nivel usa este formato:
  * <pre>
  *   # comentario
  *   name: Mazmorra 1    # título que muestra el juego
+ *   time: 02:30
+ *   ambient_light: dim      # dark | dim | normal | bright
+ *   view_distance: normal   # low | normal | high
  *   map:
  *   ‣...fila con glifos...
  * </pre>
@@ -45,6 +50,7 @@ public final class LevelLoader {
     public static final int DEFAULT_TIME_SECONDS = 60;
 
     private static final String LEVEL_DIR = "levels";
+    private static final String LEVEL_TYPES_DIR = "level_types";
     private static final String SYMBOLS_FILE = "symbolsLevel.txt";
 
     /** Referencia a un nivel: su título, tiempo declarado y la ruta del recurso. */
@@ -107,29 +113,15 @@ public final class LevelLoader {
      *         {@code mm:ss}, o {@link #DEFAULT_TIME_SECONDS} si no la declara.
      */
     public static int timeSeconds(String resourcePath) {
-        InputStream is = LevelLoader.class.getClassLoader().getResourceAsStream(resourcePath);
-        if (is == null) {
-            return DEFAULT_TIME_SECONDS;
-        }
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String t = line.trim();
-                if (t.startsWith("time:")) {
-                    int seconds = parseMmSs(t.substring("time:".length()).trim());
-                    if (seconds > 0) {
-                        return seconds;
-                    }
-                }
-            }
-        } catch (IOException ignored) {
-            // Recurso ilegible: se usa el tiempo por defecto.
-        }
-        return DEFAULT_TIME_SECONDS;
+        int seconds = parseMmSs(valueOf(readLines(resourcePath), "time"));
+        return seconds > 0 ? seconds : DEFAULT_TIME_SECONDS;
     }
 
     /** Parsea {@code mm:ss} a segundos; devuelve -1 si el formato no vale. */
     private static int parseMmSs(String value) {
+        if (value == null) {
+            return -1;
+        }
         String[] parts = value.split(":");
         if (parts.length == 2) {
             try {
@@ -147,29 +139,15 @@ public final class LevelLoader {
 
     /**
      * Título del nivel declarado con la directiva {@code name:} dentro del
-     * archivo.
+     * archivo. Comparte el recorte de comentarios con {@link #loadLevel}, para
+     * que el nombre del menú y el del nivel cargado nunca discrepen.
      *
      * @return el texto de la primera directiva {@code name:}, o el nombre del
      *         archivo si no la declara.
      */
     public static String getName(String resourcePath) {
-        InputStream is = LevelLoader.class.getClassLoader().getResourceAsStream(resourcePath);
-        if (is == null) {
-            return getFileName(resourcePath);
-        }
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String t = line.trim();
-                if (t.startsWith("name:")) {
-                    String name = t.substring("name:".length()).trim();
-                    return name.isEmpty() ? getFileName(resourcePath) : name;
-                }
-            }
-        } catch (IOException ignored) {
-            // Recurso ilegible: cae al nombre de archivo.
-        }
-        return getFileName(resourcePath);
+        String name = valueOf(readLines(resourcePath), "name");
+        return name == null ? getFileName(resourcePath) : name;
     }
 
     /** Nombre de archivo (sin ruta), fallback para el título. */
@@ -246,45 +224,15 @@ public final class LevelLoader {
     }
 
     /**
-     * Lee un nivel de texto desde el classpath (recurso, no ruta de disco).
+     * Atajo a {@link #loadLevel(String)} para quien solo quiere las filas.
      *
      * @param resourcePath camino relativo a la raíz de recursos
      *                      (p. ej. {@code "levels/level_01.txt"}).
-     * @return las filas del mapa (todo lo que va después de {@code map:}).
+     * @return las filas del mapa, ya rellenadas a rectángulo.
      * @throws IllegalArgumentException si el recurso no existe o está vacío.
      */
     public static String[] load(String resourcePath) {
-        List<String> rows = new ArrayList<>();
-        InputStream is = LevelLoader.class.getClassLoader().getResourceAsStream(resourcePath);
-        if (is == null) {
-            throw new IllegalArgumentException("Nivel no encontrado en recursos: " + resourcePath);
-        }
-        boolean inMap = false;
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.isBlank()) {
-                    continue;
-                }
-                String t = line.trim();
-                if (t.startsWith("#") || t.startsWith("name:") || t.startsWith("time:")) {
-                    continue;
-                }
-                if (t.startsWith("map:")) {
-                    inMap = true;
-                    continue;
-                }
-                if (inMap) {
-                    rows.add(stripTrailingWhitespace(line));
-                }
-            }
-        } catch (IOException e) {
-            throw new IllegalArgumentException("Error leyendo el nivel: " + resourcePath, e);
-        }
-        if (rows.isEmpty()) {
-            throw new IllegalArgumentException("Nivel vacío (falta 'map:'): " + resourcePath);
-        }
-        return rows.toArray(new String[0]);
+        return loadLevel(resourcePath).toRows();
     }
 
     /** Por soporte de glifos anchos, se conservan los espacios en blanco entre
@@ -295,5 +243,246 @@ public final class LevelLoader {
             end--;
         }
         return line.substring(0, end);
+    }
+
+    // ---------------------------------------------------------------------
+    // Parser por fases
+    // ---------------------------------------------------------------------
+
+    /**
+     * Lee un nivel completo y lo resuelve en tres fases, en este orden:
+     *
+     * <ol>
+     *   <li><b>Preset</b>: si el archivo declara {@code level_type: <nombre>}, se
+     *       abre {@code level_types/<nombre>.txt} y se toman sus texturas de
+     *       ambiente y sus colores de cielo. Sin esta linea el nivel usa el
+     *       preset por defecto y sigue funcionando.</li>
+     *   <li><b>Metadata</b>: {@code name:}, {@code time:}, {@code ambient_light:}
+     *       y {@code view_distance:}. Las dos ultimas se traducen con
+     *       {@link Atmosphere} y quedan como numeros.</li>
+     *   <li><b>Mapa</b>: todo lo que sigue a {@code map:} pasa a
+     *       {@code char[][]}, rellenando con espacios hasta un rectangulo.</li>
+     * </ol>
+     *
+     * @param resourcePath ruta del recurso (p. ej. {@code levels/level_01.txt}).
+     * @return el nivel resuelto, con metadata ya traducida.
+     * @throws IllegalArgumentException si el recurso no existe o no trae mapa.
+     */
+    public static LevelData loadLevel(String resourcePath) {
+        List<String> lines = readLines(resourcePath);
+        if (lines.isEmpty()) {
+            throw new IllegalArgumentException("Nivel vacío: " + resourcePath);
+        }
+
+        // Fase 1: preset heredado de level_types/.
+        LevelTypePreset preset = null;
+        String presetName = valueOf(lines, "level_type");
+        if (presetName != null) {
+            preset = loadPreset(presetName);
+        }
+        if (preset == null) {
+            preset = LevelTypePreset.defaultPreset("default");
+        }
+
+        // Fase 2: metadata propia del nivel.
+        String name = valueOf(lines, "name");
+        if (name == null || name.isEmpty()) {
+            name = getFileName(resourcePath);
+        }
+        int time = parseMmSs(valueOf(lines, "time"));
+        if (time <= 0) {
+            time = DEFAULT_TIME_SECONDS;
+        }
+        float ambient = Atmosphere.ambientLight(valueOf(lines, "ambient_light"));
+        float viewDistance = Atmosphere.viewDistance(valueOf(lines, "view_distance"));
+
+        // Fase 3: matriz del mapa.
+        char[][] map = toMatrix(rowsAfterMap(lines));
+
+        return new LevelData(resourcePath, name, time, ambient, viewDistance, preset, map);
+    }
+
+    /**
+     * Fase 1: carga {@code level_types/<nombre>.txt}. El preset admite
+     * {@code floor_texture}, {@code ceiling_texture}, {@code sky_type},
+     * {@code sky_speed}, {@code sky_horizon_color} y {@code sky_zenith_color};
+     * cualquiera puede faltar y se hereda del preset por defecto. Los colores
+     * se escriben como {@code #RRGGBB} o como tres floats separados por comas.
+     */
+    private static LevelTypePreset loadPreset(String presetName) {
+        String path = LEVEL_TYPES_DIR + "/" + presetName + ".txt";
+        List<String> lines = readLines(path);
+        LevelTypePreset base = LevelTypePreset.defaultPreset(presetName);
+        if (lines.isEmpty()) {
+            System.err.println("[LevelLoader] Preset no encontrado, uso el por defecto: " + path);
+            return base;
+        }
+
+        String floor = valueOf(lines, "floor_texture");
+        String ceiling = valueOf(lines, "ceiling_texture");
+        // Opcional: si el preset no la fija, el muro sigue siendo el global.
+        String wall = valueOf(lines, "wall_texture");
+        String skyType = valueOf(lines, "sky_type");
+        if (skyType == null) {
+            skyType = base.getSkyType();
+        } else if (!LevelTypePreset.isKnownSkyType(skyType)) {
+            // El shader solo implementa un perfil de cielo hoy. avisar es
+            // mejor que ignorar un typo en silencio y pintar de otra cosa.
+            System.err.println("[LevelLoader] sky_type desconocido en " + path + ": " + skyType
+                    + " (se usa " + base.getSkyType() + ")");
+            skyType = base.getSkyType();
+        }
+        float skySpeed = parseFloatOr(valueOf(lines, "sky_speed"), base.getSkySpeed());
+        Vector3f horizon = parseColor(valueOf(lines, "sky_horizon_color"), base.getSkyHorizonColor());
+        Vector3f zenith = parseColor(valueOf(lines, "sky_zenith_color"), base.getSkyZenithColor());
+
+        return new LevelTypePreset(presetName, floor, ceiling, wall, skyType, skySpeed, horizon, zenith);
+    }
+
+    /** Lee todas las lineas de un recurso del classpath. */
+    private static List<String> readLines(String resourcePath) {
+        List<String> lines = new ArrayList<>();
+        InputStream is = LevelLoader.class.getClassLoader().getResourceAsStream(resourcePath);
+        if (is == null) {
+            return lines;
+        }
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                lines.add(line);
+            }
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Error leyendo el nivel: " + resourcePath, e);
+        }
+        return lines;
+    }
+
+    /**
+     * Devuelve el valor de la primera directiva {@code clave: valor}, o
+     * {@code null} si no aparece. Ignora comentarios y lineas en blanco, y
+     * tambien el comentario que va pegado al valor
+     * ({@code name: Sala 1  # el titulo}), que es parte del formato. Un
+     * {@code #} pegado a una palabra se respeta, para que un nombre como
+     * {@code Sala #3} no se corte.
+     */
+    private static String valueOf(List<String> lines, String key) {
+        for (String line : lines) {
+            String t = line.trim();
+            if (t.isEmpty() || t.startsWith("#")) {
+                continue;
+            }
+            if (t.startsWith(key + ":")) {
+                String value = stripInlineComment(t.substring(key.length() + 1)).trim();
+                if (!value.isEmpty()) {
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Corta el comentario en linea de un valor ya recortado.
+     *
+     * <p>Regla: un {@code #} seguido de espacio abre comentario, salvo si es
+     * el primer caracter del valor, porque ahi es un color hexadecimal
+     * ({@code sky_horizon_color: #112233}) y no una nota. El precio de la
+     * regla es que un nombre no puede llevar espacio antes del {@code #}
+     * ({@code Sala#3} si, {@code Sala #3} no: se leeria como comentario).
+     */
+    private static String stripInlineComment(String value) {
+        int start = 0;
+        while (start < value.length() && Character.isWhitespace(value.charAt(start))) {
+            start++;
+        }
+        if (start >= value.length() || value.charAt(start) == '#') {
+            // Valor vacio, o empieza por '#': no hay comentario que cortar.
+            return value;
+        }
+        for (int i = start; i < value.length(); i++) {
+            if (value.charAt(i) == '#' && Character.isWhitespace(value.charAt(i - 1))) {
+                return value.substring(0, i);
+            }
+        }
+        return value;
+    }
+
+    /** Todas las lineas posteriores a {@code map:}, sin comentarios. */
+    private static List<String> rowsAfterMap(List<String> lines) {
+        List<String> rows = new ArrayList<>();
+        boolean inMap = false;
+        for (String line : lines) {
+            String t = line.trim();
+            if (!inMap) {
+                if (t.startsWith("map:")) {
+                    inMap = true;
+                }
+                continue;
+            }
+            if (t.isEmpty() || t.startsWith("#")) {
+                continue;
+            }
+            rows.add(stripTrailingWhitespace(line));
+        }
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("Nivel vacío (falta 'map:'): " + lines);
+        }
+        return rows;
+    }
+
+    /** Convierte filas en una matriz rectangular rellenando con espacios. */
+    private static char[][] toMatrix(List<String> rows) {
+        int width = 0;
+        for (String row : rows) {
+            width = Math.max(width, row.length());
+        }
+        char[][] map = new char[rows.size()][width];
+        for (int r = 0; r < rows.size(); r++) {
+            String row = rows.get(r);
+            for (int c = 0; c < width; c++) {
+                map[r][c] = c < row.length() ? row.charAt(c) : ' ';
+            }
+        }
+        return map;
+    }
+
+    /** Acepta {@code #RRGGBB}, {@code RRGGBB} o {@code r,g,b} en 0..1. */
+    private static Vector3f parseColor(String raw, Vector3f fallback) {
+        if (raw == null) {
+            return fallback;
+        }
+        String value = raw.trim();
+        try {
+            if (value.contains(",")) {
+                String[] parts = value.split(",");
+                if (parts.length == 3) {
+                    return new Vector3f(Float.parseFloat(parts[0].trim()),
+                            Float.parseFloat(parts[1].trim()),
+                            Float.parseFloat(parts[2].trim()));
+                }
+            }
+            String hex = value.startsWith("#") ? value.substring(1) : value;
+            if (hex.length() == 6) {
+                return new Vector3f(
+                        Integer.parseInt(hex.substring(0, 2), 16) / 255f,
+                        Integer.parseInt(hex.substring(2, 4), 16) / 255f,
+                        Integer.parseInt(hex.substring(4, 6), 16) / 255f);
+            }
+        } catch (NumberFormatException ignored) {
+            // Formato no reconocido: se mantiene el color heredado.
+        }
+        System.err.println("[LevelLoader] Color no valido, uso el heredado: " + raw);
+        return fallback;
+    }
+
+    private static float parseFloatOr(String raw, float fallback) {
+        if (raw == null) {
+            return fallback;
+        }
+        try {
+            return Float.parseFloat(raw.trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 }

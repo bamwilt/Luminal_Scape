@@ -1,0 +1,17 @@
+# Preset de nivel: los backrooms.
+# Es el aspecto por defecto del juego: moqueta humeda, cielo mostaza sin sol
+# y poca luz. Lo heredan los niveles cerrados y claustrofobicos.
+
+floor_texture: textures/br_carpet.png
+ceiling_texture: textures/br_ceiling_tiles.png
+
+# Muro pintado amarillo del pack: es lo que define el nivel. Antes era la
+# textura global para todos.
+wall_texture: textures/br_painted_wall.png
+
+sky_type: gradient
+sky_speed: 0.03
+
+# Mostaza en el horizonte, pardo oscuro hacia arriba.
+sky_horizon_color: #877A21
+sky_zenith_color: #2E290E

@@ -60,8 +60,15 @@ public class Player {
 
         camera.setPosition(pos);
 
+        // La caja de colisión va de los PIES a la CABEZA, no desde el ojo: la
+        // cámara está baseHeight por encima del suelo, así que medir desde su Y
+        // desplazaba todo el cuerpo hacia arriba y el jugador medía 1.8 desde
+        // la altura de los ojos (1.6), reaching 3.4. Con eso no cabía de pie
+        // bajo ningún dintel. Aquí los pies están en el suelo (el juego no tiene
+        // salto ni gravedad) y la caja es [suelo, suelo + altura del cuerpo].
+        Vector3f feet = new Vector3f(pos.x, 0f, pos.z);
         Vector3f size = new Vector3f(playerWidth, targetHeight, playerDepth);
-        collisionManager.setPlayerBounds(camera.getPosition(), size);
+        collisionManager.setPlayerBounds(feet, size);
 
         if (collisionManager.checkCollisions()) {
             camera.setPosition(previousPos);

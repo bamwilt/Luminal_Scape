@@ -16,7 +16,19 @@ import static org.lwjgl.opengl.GL30.glGenerateMipmap;
 
 public class TextureLoader {
 
+    /**
+     * Textura cargada con su tamaño original en píxeles. Lo necesitan los quads
+     * de interfaz, que calculan la altura a partir de la anchura para no
+     * deformar la imagen.
+     */
+    public record LoadedTexture(int id, int width, int height) {
+    }
+
     public static int loadTexture(String resourcePath) {
+        return loadTextureInfo(resourcePath).id();
+    }
+
+    public static LoadedTexture loadTextureInfo(String resourcePath) {
         // Leer el recurso desde classpath
         ByteBuffer imageBuffer;
         try {
@@ -49,7 +61,7 @@ public class TextureLoader {
         glGenerateMipmap(GL_TEXTURE_2D);
 
         STBImage.stbi_image_free(decodedImage);
-        return textureID;
+        return new LoadedTexture(textureID, width.get(0), height.get(0));
     }
 
     // Método para cargar un archivo del classpath como ByteBuffer

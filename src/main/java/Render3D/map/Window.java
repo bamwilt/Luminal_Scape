@@ -1,6 +1,6 @@
 package Render3D.map;
 
-import Render3D.graphics.Wall;
+import Render3D.mesh.Box;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,11 +15,11 @@ import java.util.List;
 public class Window extends Opening {
 
     @Override
-    public List<Wall> buildPanels(float width, float depth, float centerX, float centerZ,
-                                  int wallTexture, float wallHeight, float textureScale) {
-        List<Wall> panels = new ArrayList<>();
-        addBottomPanel(panels, width, MapConfig.WINDOW_SILL_HEIGHT, depth, centerX, centerZ, wallTexture, textureScale);
-        addTopPanel(panels, width, MapConfig.WINDOW_HEADER_HEIGHT, depth, centerX, centerZ, wallTexture, wallHeight, textureScale);
+    public List<Box> buildBoxes(float width, float depth, float centerX, float centerZ,
+                                float wallHeight) {
+        List<Box> panels = new ArrayList<>(2);
+        addBottomPanel(panels, width, MapConfig.WINDOW_SILL_HEIGHT, depth, centerX, centerZ);
+        addTopPanel(panels, width, MapConfig.WINDOW_HEADER_HEIGHT, depth, centerX, centerZ, wallHeight);
         return panels;
     }
 }

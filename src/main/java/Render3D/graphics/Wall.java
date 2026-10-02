@@ -1,189 +1,114 @@
 package Render3D.graphics;
 
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.*;
-import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL20.*;
-import static org.lwjgl.opengl.GL30.*;
-import static org.lwjgl.opengl.GL31.*;
-
+import Render3D.mesh.Mesh;
+import Render3D.mesh.MeshBuilder;
+import Render3D.mesh.UvSpace;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import org.lwjgl.BufferUtils;
-
-import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
-import java.util.ArrayList;
-import java.util.List;
 import UtilsRender.Shader;
-import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
 
+import static org.lwjgl.opengl.GL11.GL_REPEAT;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_WRAP_S;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_WRAP_T;
+import static org.lwjgl.opengl.GL11.glBindTexture;
+import static org.lwjgl.opengl.GL11.glTexParameteri;
+import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
+import static org.lwjgl.opengl.GL13.glActiveTexture;
+
+/**
+ * Caja rectangular con textura, orientada al mundo mediante una matriz
+ * {@code model}. Es la geometría de <b>objetos sueltos que se mueven</b>: los
+ * items que rotan, que son lo único que no entra en las mallas batcheadas del
+ * nivel. Muros, aberturas, pisos, techos y barandillas se acumulan en tres
+ * mallas estáticas con {@link Render3D.map.WallAutotiler} y
+ * {@link Render3D.mesh.MeshBuilder}.
+ *
+ * <h2>UVs proporcionales al tamaño de cada cara</h2>
+ * El mesh se construye con un {@link MeshBuilder} en {@link UvSpace#LOCAL}: la
+ * UV de cada cara se mide en el espacio local del objeto, no como un
+ * (0,0)-(1,1) fijo. Para una cara de ancho {@code w} y alto {@code h}:
+ *
+ * <pre>
+ *   U_max - U_min = w * uScale
+ *   V_max - V_min = h * vScale
+ * </pre>
+ *
+ * así un panel de 4 x 1 muestra cuatro veces más textura en U que en V, y el
+ * canto de 4 x 0.4 de un piso no hereda el tiling de su cara de 4 x 4. Como
+ * las UV pueden superar 1, la textura necesita {@code GL_REPEAT} (por eso
+ * {@code TextureLoader} lo activa siempre y {@link #setTexture} lo vuelve a
+ * fijar en cada uso).
+ *
+ * <p>Al medir en espacio local, la textura queda <b>pegada al objeto</b> cuando
+ * rota o se desplaza. Para la geometría estática que ya vive en coordenadas de
+ * mundo, el {@link MeshBuilder} usa {@link UvSpace#WORLD}, que da además
+ * continuidad entre cajas contiguas.
+ */
 public class Wall {
 
-    // Buffers
-    private int vao;
-    private int vbo;
-    private int ebo;
-    private int instanceVBO; // Buffer para instancias
+    private Mesh mesh;
 
-    // Propiedades
-    private int textureID;
-    private boolean hasTexture;
-    private boolean hasLighting;
+    private final int textureID;
+    private final boolean hasTexture;
     private float[] color;
-    private float width;
-    private float height;
-    private float depth;
+    private boolean hasLighting;
+
+    private final float width;
+    private final float height;
+    private final float depth;
+
+    // UVs: repeticiones de textura por unidad de objeto.
+    private float uvScaleU;
+    private float uvScaleV;
 
     // Transformaciones
-    private Vector3f position = new Vector3f(0, 0, 0);
-    private Vector3f rotation = new Vector3f(0, 0, 0);
-    private Vector3f scale = new Vector3f(1, 1, 1);
+    private final Vector3f position = new Vector3f(0, 0, 0);
+    private final Vector3f rotation = new Vector3f(0, 0, 0);
+    private final Vector3f scale = new Vector3f(1, 1, 1);
 
-    private Matrix4f modelMatrix = new Matrix4f().identity();
-    private FloatBuffer matrixBuffer = BufferUtils.createFloatBuffer(16);
+    private final Matrix4f modelMatrix = new Matrix4f().identity();
 
-    // Textura
-    private float textureScaleX = 1.0f;
-    private float textureScaleY = 1.0f;
-
-    // Instanced rendering
-    private List<Matrix4f> instanceMatrices = new ArrayList<>();
-    private boolean isInstanced = false;
-    private int instanceCount = 0;
-
-    // Constructores
     public Wall(float width, float height, float depth, int textureID, boolean withLighting) {
-        init(width, height, depth, new float[]{1f, 1f, 0f, 1f}, withLighting);
-        this.textureID = textureID;
-        this.hasTexture = true;
+        this(width, height, depth, textureID, withLighting,
+                Render3D.map.MapConfig.UV_SCALE, Render3D.map.MapConfig.UV_SCALE);
     }
 
-    public Wall(float width, float height, float depth, float[] color, boolean withLighting) {
-        init(width, height, depth, color != null ? color : new float[]{1f, 1f, 0f, 1f}, withLighting);
-        this.hasTexture = false;
-        this.textureID = 0;
-    }
-
-    private void init(float width, float height, float depth, float[] color, boolean withLighting) {
+    public Wall(float width, float height, float depth, int textureID, boolean withLighting,
+                float uvScaleU, float uvScaleV) {
         this.width = width;
         this.height = height;
         this.depth = depth;
-        this.color = color;
+        this.textureID = textureID;
+        this.hasTexture = true;
+        this.color = new float[] {1f, 1f, 0f, 1f};
         this.hasLighting = withLighting;
-        setupMesh();
+        this.uvScaleU = uvScaleU;
+        this.uvScaleV = uvScaleV;
+        this.mesh = buildMesh();
         updateModelMatrix();
     }
 
-    private void setupMesh() {
-        float w = width / 2f;
-        float h = height / 2f;
-        float d = depth / 2f;
-
-        float[] vertices = {
-            // Posición           Normal              UV
-            // Cara frontal (z+)
-            -w, -h, d, 0f, 0f, 1f, 0f, 0f,
-            w, -h, d, 0f, 0f, 1f, textureScaleX, 0f,
-            w, h, d, 0f, 0f, 1f, textureScaleX, textureScaleY,
-            -w, h, d, 0f, 0f, 1f, 0f, textureScaleY,
-            // Cara trasera (z-)
-            w, -h, -d, 0f, 0f, -1f, 0f, 0f,
-            -w, -h, -d, 0f, 0f, -1f, textureScaleX, 0f,
-            -w, h, -d, 0f, 0f, -1f, textureScaleX, textureScaleY,
-            w, h, -d, 0f, 0f, -1f, 0f, textureScaleY,
-            // Cara superior (y+)
-            -w, h, d, 0f, 1f, 0f, 0f, 0f,
-            w, h, d, 0f, 1f, 0f, textureScaleX, 0f,
-            w, h, -d, 0f, 1f, 0f, textureScaleX, textureScaleY,
-            -w, h, -d, 0f, 1f, 0f, 0f, textureScaleY,
-            // Cara inferior (y-)
-            -w, -h, -d, 0f, -1f, 0f, 0f, 0f,
-            w, -h, -d, 0f, -1f, 0f, textureScaleX, 0f,
-            w, -h, d, 0f, -1f, 0f, textureScaleX, textureScaleY,
-            -w, -h, d, 0f, -1f, 0f, 0f, textureScaleY,
-            // Cara derecha (x+)
-            w, -h, d, 1f, 0f, 0f, 0f, 0f,
-            w, -h, -d, 1f, 0f, 0f, textureScaleX, 0f,
-            w, h, -d, 1f, 0f, 0f, textureScaleX, textureScaleY,
-            w, h, d, 1f, 0f, 0f, 0f, textureScaleY,
-            // Cara izquierda (x-)
-            -w, -h, -d, -1f, 0f, 0f, 0f, 0f,
-            -w, -h, d, -1f, 0f, 0f, textureScaleX, 0f,
-            -w, h, d, -1f, 0f, 0f, textureScaleX, textureScaleY,
-            -w, h, -d, -1f, 0f, 0f, 0f, textureScaleY
-        };
-
-        int[] indices = {
-            0, 1, 2, 2, 3, 0, // frontal
-            4, 5, 6, 6, 7, 4, // trasera
-            8, 9, 10, 10, 11, 8, // superior
-            12, 13, 14, 14, 15, 12, // inferior
-            16, 17, 18, 18, 19, 16, // derecha
-            20, 21, 22, 22, 23, 20 // izquierda
-        };
-
-        vao = glGenVertexArrays();
-        glBindVertexArray(vao);
-
-        vbo = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, vertices, GL_STATIC_DRAW);
-
-        ebo = glGenBuffers();
-        IntBuffer ib = BufferUtils.createIntBuffer(indices.length);
-        ib.put(indices).flip();
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, ib, GL_STATIC_DRAW);
-
-        // Atributos estándar
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, 8 * Float.BYTES, 0);
-        glEnableVertexAttribArray(0);
-
-        glVertexAttribPointer(1, 3, GL_FLOAT, false, 8 * Float.BYTES, 3 * Float.BYTES);
-        glEnableVertexAttribArray(1);
-
-        glVertexAttribPointer(2, 2, GL_FLOAT, false, 8 * Float.BYTES, 6 * Float.BYTES);
-        glEnableVertexAttribArray(2);
-
-        // Configurar instanced rendering si hay instancias
-        if (!instanceMatrices.isEmpty()) {
-            setupInstanceBuffer();
-        }
-
-        glBindVertexArray(0);
+    public Wall(float width, float height, float depth, float[] color, boolean withLighting) {
+        this.width = width;
+        this.height = height;
+        this.depth = depth;
+        this.textureID = 0;
+        this.hasTexture = false;
+        this.color = color != null ? color : new float[] {1f, 1f, 0f, 1f};
+        this.hasLighting = withLighting;
+        this.uvScaleU = Render3D.map.MapConfig.UV_SCALE;
+        this.uvScaleV = Render3D.map.MapConfig.UV_SCALE;
+        this.mesh = buildMesh();
+        updateModelMatrix();
     }
 
-    private void setupInstanceBuffer() {
-        instanceVBO = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-        updateInstanceBuffer();
-        
-        glBindVertexArray(vao);
-        
-        // Atributos para matriz de instancia (4 vectores de 4 floats)
-        for (int i = 0; i < 4; i++) {
-            int attribLocation = 3 + i;
-            glEnableVertexAttribArray(attribLocation);
-            glVertexAttribPointer(attribLocation, 4, GL_FLOAT, false, 16 * Float.BYTES, i * 16);
-            glVertexAttribDivisor(attribLocation, 1);
-        }
-        
-        glBindVertexArray(0);
-        isInstanced = true;
-    }
-
-    private void updateInstanceBuffer() {
-        if (instanceMatrices.isEmpty()) return;
-        
-        FloatBuffer buffer = BufferUtils.createFloatBuffer(instanceCount * 16);
-        for (Matrix4f matrix : instanceMatrices) {
-            matrix.get(buffer);
-        }
-        buffer.flip();
-        
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, buffer, GL_STATIC_DRAW);
+    private Mesh buildMesh() {
+        MeshBuilder builder = new MeshBuilder();
+        builder.addBoxCentered(0f, 0f, 0f, width, height, depth,
+                UvSpace.LOCAL, uvScaleU, uvScaleV);
+        return builder.build();
     }
 
     private void updateModelMatrix() {
@@ -196,14 +121,6 @@ public class Wall {
     }
 
     public void render(Shader shader) {
-        // Configurar shader
-        if (!isInstanced || instanceCount == 0) {
-            // Renderizado normal para una instancia
-            modelMatrix.get(matrixBuffer);
-            shader.setMat4("model", matrixBuffer);
-        }
-        
-        // Textura
         if (hasTexture) {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, textureID);
@@ -213,27 +130,13 @@ public class Wall {
             shader.setVec4("objectColor", color[0], color[1], color[2], color[3]);
             shader.setBool("useTexture", false);
         }
-        
-        shader.setBool("useLighting", hasLighting);
-        shader.setBool("useInstance", isInstanced && instanceCount > 0);
 
-        // Renderizado
-        glBindVertexArray(vao);
-        if (isInstanced && instanceCount > 0) {
-            glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, instanceCount);
-        } else {
-            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-        }
-        glBindVertexArray(0);
+        shader.setBool("useLighting", hasLighting);
+        mesh.render(shader, modelMatrix);
     }
 
     public void cleanup() {
-        glDeleteVertexArrays(vao);
-        glDeleteBuffers(vbo);
-        glDeleteBuffers(ebo);
-        if (isInstanced) {
-            glDeleteBuffers(instanceVBO);
-        }
+        mesh.cleanup();
     }
 
     // Métodos de transformación
@@ -262,27 +165,6 @@ public class Wall {
         updateModelMatrix();
     }
 
-    // Métodos para instanced rendering
-    public void addInstance(Matrix4f modelMatrix) {
-        instanceMatrices.add(new Matrix4f(modelMatrix));
-        instanceCount = instanceMatrices.size();
-        
-        if (isInstanced) {
-            updateInstanceBuffer();
-        } else {
-            setupInstanceBuffer();
-        }
-    }
-
-    public void clearInstances() {
-        instanceMatrices.clear();
-        instanceCount = 0;
-        if (isInstanced) {
-            glDeleteBuffers(instanceVBO);
-            isInstanced = false;
-        }
-    }
-
     // Getters
     public Vector3f getPosition() {
         return new Vector3f(position);
@@ -292,57 +174,65 @@ public class Wall {
         return new Vector3f(width, height, depth);
     }
 
+    /**
     // Textura y color
-    public void setTexture(int textureID, float scaleX, float scaleY, boolean repeat) {
-        this.textureID = textureID;
-        this.hasTexture = true;
-        this.textureScaleX = scaleX;
-        this.textureScaleY = scaleY;
-
+    /**
+     * Fija la textura y su modo de repetición. No reconstruye la geometría: las
+     * UV ya salen del tamaño real de cada cara, así que solo hace falta fijar el
+     * wrap, que debe ser {@code GL_REPEAT} para que el world-space tiling
+     * funcione.
+     */
+    public void setTexture(int textureID, boolean repeat) {
         glBindTexture(GL_TEXTURE_2D, textureID);
-        if (repeat) {
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        } else {
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        }
+        int wrap = repeat ? GL_REPEAT : GL_CLAMP_TO_EDGE;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
         glBindTexture(GL_TEXTURE_2D, 0);
-
-        updateTextureCoords();
     }
 
     public void setColor(float[] color) {
         this.color = color;
-        this.hasTexture = false;
     }
 
     public void setLightingEnabled(boolean enabled) {
         this.hasLighting = enabled;
     }
 
-    public void setTextureScale(float scaleX, float scaleY) {
-        this.textureScaleX = scaleX;
-        this.textureScaleY = scaleY;
-        updateTextureCoords();
+    /**
+     * Cambia la densidad de textura y <b>reconstruye</b> el mesh, porque el
+     * rango de UV es proporcional a la escala. Solo hay que llamarlo si se
+     * quiere otra densidad distinta de {@link Render3D.map.MapConfig#UV_SCALE}.
+     */
+    public void setUvScale(float uvScaleU, float uvScaleV) {
+        if (uvScaleU == this.uvScaleU && uvScaleV == this.uvScaleV) {
+            return;
+        }
+        this.uvScaleU = uvScaleU;
+        this.uvScaleV = uvScaleV;
+        Mesh previous = this.mesh;
+        this.mesh = buildMesh();
+        previous.cleanup();
     }
 
-    private void updateTextureCoords() {
-        if (!hasTexture) return;
+    public float getUvScaleU() {
+        return uvScaleU;
+    }
 
-        // Regenerar geometría con nuevas coordenadas UV
-        cleanup();
-        setupMesh();
-        if (isInstanced) {
-            setupInstanceBuffer();
-        }
+    public float getUvScaleV() {
+        return uvScaleV;
     }
 
     public int getTextureID() {
         return textureID;
     }
-    
-    public boolean isInstanced() {
-        return isInstanced && instanceCount > 0;
+
+    public boolean hasTexture() {
+        return hasTexture;
     }
+
+    /** Malla GPU de la caja, por si hace falta dibujarla con otro shader. */
+    public Mesh getMesh() {
+        return mesh;
+    }
+
 }

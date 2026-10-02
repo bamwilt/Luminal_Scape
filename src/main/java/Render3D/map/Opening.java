@@ -1,8 +1,7 @@
 package Render3D.map;
 
-import Render3D.graphics.Wall;
+import Render3D.mesh.Box;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -14,6 +13,12 @@ import java.util.List;
  * </ul>
  * El hueco entre ambas deja pasar la vista (y, si la pared inferior es mínima,
  * el paso del jugador).
+ *
+ * <p>Las plantillas devuelven CAJAS en coordenadas de mundo, no mallas: el
+ * {@link Render3D.mesh.MeshBuilder} las vuelca todas en la misma malla de la
+ * mazmorra. Al compartir sistema de coordenadas con los muros, la textura sigue
+ * siendo continua a través del alféizar y el dintel (una caja con UV en
+ * espacio local reiniciaría el patrón justo en la unión).
  */
 public abstract class Opening {
 
@@ -23,27 +28,23 @@ public abstract class Opening {
      * Genera los paneles de la abertura con la orientación dada por
      * {@code width} / {@code depth} (ancho y espesor de la celda).
      */
-    public abstract List<Wall> buildPanels(float width, float depth, float centerX, float centerZ,
-                                           int wallTexture, float wallHeight, float textureScale);
+    public abstract List<Box> buildBoxes(float width, float depth, float centerX, float centerZ,
+                                         float wallHeight);
 
-    protected static void addBottomPanel(List<Wall> panels, float width, float sill, float depth,
-                                         float centerX, float centerZ, int wallTexture, float textureScale) {
+    protected static void addBottomPanel(List<Box> panels, float width, float sill, float depth,
+                                         float centerX, float centerZ) {
         if (sill < MINIMAL_SILL) {
             return;
         }
-        Wall bottom = new Wall(width, sill, depth, wallTexture, true);
-        bottom.setPosition(centerX, sill / 2f, centerZ);
-        bottom.setTexture(wallTexture, textureScale, textureScale, true);
-        panels.add(bottom);
+        panels.add(Box.centeredOnFloor(centerX, 0f, centerZ, width, sill, depth));
     }
 
-    protected static void addTopPanel(List<Wall> panels, float width, float header, float depth,
-                                      float centerX, float centerZ, int wallTexture,
-                                      float wallHeight, float textureScale) {
+    protected static void addTopPanel(List<Box> panels, float width, float header, float depth,
+                                      float centerX, float centerZ, float wallHeight) {
         float height = wallHeight - header;
-        Wall top = new Wall(width, height, depth, wallTexture, true);
-        top.setPosition(centerX, header + height / 2f, centerZ);
-        top.setTexture(wallTexture, textureScale, textureScale, true);
-        panels.add(top);
+        if (height <= 0f) {
+            return;
+        }
+        panels.add(Box.centeredOnFloor(centerX, header, centerZ, width, height, depth));
     }
 }

@@ -95,6 +95,20 @@ public class Camera {
         updateViewMatrix();
     }
 
+    /**
+     * Suma un giro al yaw actual, en grados.
+     *
+     * <p>Existe para las teclas Q/E, que giran de forma continua mientras se
+     * mantienen pulsadas: cada frame suman {@code gradosPorSegundo} por el
+     * tiempo transcurrido, en vez de un salto fijo por pulsación. Se apoya en
+     * {@link #setYaw} para que el vector de dirección y la matriz de vista se
+     * recalculen igual que cuando gira el ratón, y los dos controles nunca
+     * puedan dejar la cámara desincronizada.
+     */
+    public void rotateYaw(float grados) {
+        setYaw(yaw + grados);
+    }
+
     private void updateViewMatrix() {
         viewMatrix.identity()
                 .lookAt(position, new Vector3f(position).add(front), up);
