@@ -1,5 +1,6 @@
 package Render3D.map;
 
+
 /**
  * UN solo lugar para TODO lo editable de la mazmorra: las constantes de
  * geometría (tamaño de celda, muros, aberturas, railings), la tabla de
@@ -20,8 +21,9 @@ package Render3D.map;
  *   <li>Vista y niebla                -> {@link #VIEW_DISTANCE_LOW},
  *       {@link #VIEW_DISTANCE_NORMAL}, {@link #VIEW_DISTANCE_HIGH},
  *       {@link #FOG_NEAR_RATIO}, {@link #CAMERA_HEIGHT}.</li>
- *   <li>Decoración                    -> {@link #PROP_BASE_Y},
- *       {@link #PROP_SCALE}, {@link #PROP_DENSITY}.</li>
+ *   <li>Decoración                    -> el símbolo '#' del nivel
+ *       ({@link SymbolType#DECORATION}) más {@link #PROP_BASE_Y} y
+ *       {@link #PROP_SCALE}; el catálogo de piezas vive en {@code PropLayout}.</li>
  *   <li>Luces (techo con luz e items) -> {@link #LIGHT_CEILING_EMISSION},
  *       {@link #LIGHT_CEILING_INTENSITY}, {@link #ITEM_LIGHT_INTENSITY},
  *       {@link #LIGHT_ATTEN_LINEAR}, {@link #LIGHT_ATTEN_QUADRATIC},
@@ -37,7 +39,7 @@ public final class MapConfig {
     //
     // TILE_SIZE es el lado de una casilla en unidades del mundo. Todo lo demás
     // (muros, aberturas, texturas) se deriva de ella, así que cambiar esta
-    // escala el mapa completo sin tocar ningún otro número.
+    // scale el mapa completo sin tocar ningún otro número.
     public static final float TILE_SIZE = 2.0f;
 
     /** Grosor del muro, en la dirección en la que se orienta. */
@@ -64,7 +66,7 @@ public final class MapConfig {
 
     public static final float FLOOR_THICKNESS = 0.4f;
     // El tamaño del item ya no es una constante de aqui: cada tipo de item
-    // escala su propio modelo (ver ItemKey), y el cubo de 0,8 que usaba esto
+    // scale su propio modelo (ver ItemKey), y el cubo de 0,8 que usaba esto
     // desaparecio cuando la llave paso a ser un GLB.
     public static final float ITEM_FLOAT_HEIGHT = 1.6f; // altura de la cámara
     public static final float ITEM_SPIN_SPEED = 1.5f;   // rad/seg
@@ -72,8 +74,8 @@ public final class MapConfig {
 
     // Aberturas: UN solo lugar para ajustar ventanas y puertas. Todas por
     // debajo de WALL_HEIGHT.
-    public static final float WINDOW_SILL_HEIGHT = 1.0f;   // pared inferior de la ventana
-    public static final float WINDOW_HEADER_HEIGHT = 3.0f; // pared superior de la ventana
+    public static final float WINDOW_SILL_HEIGHT = 1.0f;   // pared inferior de la window
+    public static final float WINDOW_HEADER_HEIGHT = 3.0f; // pared superior de la window
     public static final float DOOR_HEADER_HEIGHT = 3.0f;   // hueco de la puerta: un poco sobre la cámara
 
     // Raillings: un muro bajo, un poco por debajo de la cámara.
@@ -116,7 +118,7 @@ public final class MapConfig {
     public static final float KEY_YAW_SPEED = 120.0f;
 
     /**
-     * Altura de la cámara (los ojos del jugador).
+     * Altura de la cámara (los ojos del player).
      *
      * <p>El suelo visible es una losa de {@link #FLOOR_THICKNESS}, así que la
      * altura real del ojo sobre el piso es esta menos {@code FLOOR_THICKNESS}.
@@ -138,24 +140,23 @@ public final class MapConfig {
     /**
      * Multiplicador global del tamaño de las decoraciones.
      *
-     * <p>Es un factor sobre la escala de cada pieza del catálogo (ver
+     * <p>Es un factor sobre la scale de cada pieza del catálogo (ver
      * {@code PropLayout}): 1.0 las deja como están, 1.5 las agranda y 0.75 las
      * achica. Es global; el ajuste fino por pieza vive en el catálogo.
      */
     public static final float PROP_SCALE = 1.0f;
 
-    /**
-     * Probabilidad (0..1) de que una celda con sitio reciba decoración.
-     *
-     * <p>Era 0.22 y con muchas piezas el nivel parecía amueblado de punta a
-     * punta. Con 0.10 la decoración puntúa el recorrido en vez de llenarlo.
-     */
-    public static final float PROP_DENSITY = 0.10f;
+    // ---- Dónde se decora --------------------------------------------------
+    //
+    // La decoración ya no se reparte sola según la forma del mapa: la decide
+    // quien escribe el nivel. Se pone el símbolo '#' (SymbolType.DECORATION) en
+    // la celda donde se quiere una pieza y el juego elige cuál de forma
+    // determinista (misma celda -> misma pieza en cada partida). Ver PropLayout.
 
     // ---- Luces locales ----------------------------------------------------
     //
-    // El nivel tiene UNA luz global (GameConfig.LIGHT_*), la misma para todo el
-    // mapa. Estas son las luces PUNTUALES que se encienden cerca del jugador: la
+    // El nivel tiene UNA luz global (ConfigGlobal.LUZ_*), la misma para todo el
+    // mapa. Estas son las luces PUNTUALES que se encienden cerca del player: la
     // del techo con luz '◉' y la de cada item. Se acumulan al difuso global, con
     // caida por distancia, y solo se mandan las MAX_LIGHT_COUNT mas cercanas.
     /**
@@ -179,7 +180,7 @@ public final class MapConfig {
     public static final float LIGHT_ATTEN_QUADRATIC = 0.25f;
 
     /**
-     * A partir de esta distancia al jugador la luz se descarta y no entra en
+     * A partir de esta distancia al player la luz se descarta y no entra en
      * el array. Solo filtra candidatos: aunque se pase, el shader la apaga por
      * la caida, asi que es solo una economia.
      */
@@ -235,6 +236,76 @@ public final class MapConfig {
     public static final float ITEM_LIGHT_G = 0.80f;
     public static final float ITEM_LIGHT_B = 0.36f;
 
+    // ==================================================================
+    // PALETA DEL MINIMAPA
+    //
+    // Un color por tipo de celda, para que el plano se lea de un vistazo sin
+    // tener que ampliarlo ni mirar el mapa grande. Los valores van aquí y no en el
+    // Minimap porque son parte de la configuración visible del juego.
+    // ==================================================================
+
+    /**
+     * Muro macizo ('■' y '◙'): gris azulado oscuro, es lo que más abunda.
+     */
+    public static final float MINIMAP_WALL_R = 0.22f;
+    public static final float MINIMAP_WALL_G = 0.27f;
+    public static final float MINIMAP_WALL_B = 0.36f;
+    public static final float MINIMAP_WALL_A = 0.85f;
+
+    /**
+     * Ventana ('▣'): el mismo color que el muro, a propósito. La ventana es
+     * una pared con un hueco, no otra clase de muro, y en el plano tenía que
+     * leerse como parte de la silueta y no destacar entre el gris de la
+     * estructura.
+     */
+    public static final float MINIMAP_WINDOW_R = MINIMAP_WALL_R;
+    public static final float MINIMAP_WINDOW_G = MINIMAP_WALL_G;
+    public static final float MINIMAP_WINDOW_B = MINIMAP_WALL_B;
+    public static final float MINIMAP_WINDOW_A = MINIMAP_WALL_A;
+
+    /**
+     * Puerta ('◧'): el mismo tono que el muro, un punto más claro.
+     *
+     * <p>Una puerta se abre y se cierra, así que tiene que verse como el muro al
+     * que pertenece; solo un pelo más clara para poder localizar el paso sin
+     * dejar el plano lleno de colores que compiten entre sí.
+     */
+    public static final float MINIMAP_DOOR_R = 0.36f;
+    public static final float MINIMAP_DOOR_G = 0.43f;
+    public static final float MINIMAP_DOOR_B = 0.55f;
+    public static final float MINIMAP_DOOR_A = 0.90f;
+
+    /**
+     * Barandilla ('◰'): violeta.
+     *
+     * <p>Violeta y no azul porque el railing es el único símbolo que no es
+     * estructura ni suelo: es un hueco en el suelo con un murete. El violeta lo
+     * separa de los muros (azul grisáceo) sin pelearse con las llaves, que son
+     * las que de verdad hay que encontrar.
+     */
+    public static final float MINIMAP_RAILING_R = 0.52f;
+    public static final float MINIMAP_RAILING_G = 0.42f;
+    public static final float MINIMAP_RAILING_B = 0.80f;
+    public static final float MINIMAP_RAILING_A = 0.85f;
+
+    /** Llave restante ('◈'): dorado brillante. */
+    public static final float MINIMAP_ITEM_R = 1.00f;
+    public static final float MINIMAP_ITEM_G = 0.85f;
+    public static final float MINIMAP_ITEM_B = 0.25f;
+    public static final float MINIMAP_ITEM_A = 1.00f;
+
+    /** Suelo con techo ('◫' y spawns): gris neutro, el fondo del plano. */
+    public static final float MINIMAP_FLOOR_R = 0.44f;
+    public static final float MINIMAP_FLOOR_G = 0.51f;
+    public static final float MINIMAP_FLOOR_B = 0.56f;
+    public static final float MINIMAP_FLOOR_A = 0.60f;
+
+    /** Suelo sin techo ('▒'): más claro, se nota que está abierto al cielo. */
+    public static final float MINIMAP_FLOOR_ONLY_R = 0.56f;
+    public static final float MINIMAP_FLOOR_ONLY_G = 0.63f;
+    public static final float MINIMAP_FLOOR_ONLY_B = 0.70f;
+    public static final float MINIMAP_FLOOR_ONLY_A = 0.65f;
+
     private MapConfig() {
     }
 
@@ -242,7 +313,7 @@ public final class MapConfig {
      * Nivel de ejemplo: dos cuartos con piso y techo ('◫') unidos por un
      * puente de '◰' (piso SIN techo con dos muros bajos de 2.0 en sus bordes
      * largos). Sobre y bajo el puente hay vacío ('□'), así que queda
-     * descubierto arriba. Cada cuarto tiene ventana ('▣'), puerta ('◧'), el
+     * descubierto arriba. Cada cuarto tiene window ('▣'), puerta ('◧'), el
      * spawn ('▶' = mira al este) y items ('◈').
      */
     public static String[] sampleLayout() {
@@ -261,7 +332,7 @@ public final class MapConfig {
     /**
      * ÚNICO lugar donde se declaran los símbolos del nivel: carácter, si es
      * sólido, si se fusiona en patrones de pared, y la plantilla de abertura
-     * (ventana o puerta) si aplica. Las ventanas y puertas se alinean solas
+     * (window o puerta) si aplica. Las ventanas y puertas se alinean solas
      * comprobando sus laterales.
      */
     public enum SymbolType {
@@ -278,6 +349,22 @@ public final class MapConfig {
         FLOOR_ONLY('▒', false, false, null),
         RAILING('◰', true, false, null),
         LIT_CEILING('◉', false, false, null),
+        /**
+         * Decoracion manual ('#'): una celda de suelo que ADEMAS pide una pieza
+         * del catalogo de {@code PropLayout}.
+         *
+         * <p>Antes la decoracion era automatica y dependia de la forma del mapa
+         * (esquinas, callejones, puertas). Ahora la decide quien escribe el
+         * nivel: se pone un '#' donde se quiere una pieza, y el juego elige cual
+         * de forma determinista. El '#' es suelo normal y transitable —el player
+         * lo pisa—, solo que con un adorno encima.
+         *
+         * <p>El techo no lo lleva por si mismo: lo hereda si esta dentro de una
+         * zona techada, igual que un spawn o un item (ver
+         * {@link #needsCeilingIn}). Asi un '#' en un puente abierto no deja un
+         * panel de techo flotando en el aire.
+         */
+        DECORATION('#', false, false, null),
         ITEM('◈', false, false, null),
         /**
          * El mapa. No es un artefacto: no cuenta para el total ni da tiempo,
@@ -333,7 +420,7 @@ public final class MapConfig {
         /** Cualquier celda sobre la que se puede pisar (con o sin techo). */
         public boolean isWalkable() {
             return this == FLOOR_CEILING || this == FLOOR_ONLY || this == RAILING
-                    || this == LIT_CEILING;
+                    || this == LIT_CEILING || this == DECORATION;
         }
 
         /**

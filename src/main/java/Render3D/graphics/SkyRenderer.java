@@ -1,15 +1,13 @@
 package Render3D.graphics;
 
+import Render3D.Shader;
+import Render3D.map.LevelTypePreset;
+import java.nio.FloatBuffer;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL33;
-
-import java.nio.FloatBuffer;
-
-import Render3D.map.LevelTypePreset;
-import UtilsRender.Shader;
 
 /**
  * Cielo 3D: un cubo unitario dibujado alrededor de la camara con un degradado

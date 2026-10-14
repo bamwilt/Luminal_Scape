@@ -1,12 +1,17 @@
 package Render3D.mesh;
 
-import org.joml.Matrix4f;
-import org.lwjgl.BufferUtils;
-import UtilsRender.Shader;
-
+import Render3D.Shader;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
-
+import org.joml.Matrix4f;
+import org.lwjgl.BufferUtils;
+import static org.lwjgl.opengl.GL11.GL_FLOAT;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
+import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
+import static org.lwjgl.opengl.GL11.glBindTexture;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
+import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.GL_STATIC_DRAW;
@@ -20,13 +25,6 @@ import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
 import static org.lwjgl.opengl.GL30.glGenVertexArrays;
-import static org.lwjgl.opengl.GL11.GL_FLOAT;
-import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
-import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
-import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
-import static org.lwjgl.opengl.GL11.glBindTexture;
-import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
-import static org.lwjgl.opengl.GL13.glActiveTexture;
 
 /**
  * Malla estática en GPU: un VAO con su VBO de vértices (posición, normal, UV
@@ -46,7 +44,7 @@ import static org.lwjgl.opengl.GL13.glActiveTexture;
  * el dibujado dejaría la última textura pegada a las tres.
  *
  * <p>La textura debe cargarse con {@code GL_REPEAT} (lo hace
- * {@link UtilsRender.TextureLoader}), porque las UV se miden en coordenadas de
+ * {@link Render3D.TextureLoader}), porque las UV se miden en coordenadas de
  * mundo y salen con holgura del rango [0, 1].
  */
 public final class Mesh {

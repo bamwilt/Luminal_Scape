@@ -2,16 +2,18 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 /**
- * Comprobaciones de la pausa rapida: la M congela la partida y suelta el raton
- * SIN abrir el menu, y al volver a pulsarla la partida sigue donde estaba.
+ * Comprobaciones de la pausa rapida: la M congela la partida y suelta el raton,
+ * sin abrir el menu, y al volver a pulsarla sigue donde estaba. La pausa con
+ * menu sigue en la P.
  *
  * <p>Va en un {@code main} a proposito, como las otras regresiones del repo: no
- * hay JUnit y esto solo necesita el codigo compilado. Lo que se comprueba aqui
- * es la regla (que se congela lo que toca, que el menu no aparece y que la
- * pausa de verdad sigue en la P), porque abrir una ventana y soltar el raton no
- * se puede ejecutar sin GLFW; eso lo cubre el smoke con GL.
+ * hay JUnit y estas comprobaciones solo leen el texto de las clases. Tras sacar
+ * la entrada, el HUD y los menus de {@link GameLoop} en clases propias, cada
+ * comprobacion mira el archivo donde vive ahora su trozo de codigo.
  */
 public final class PausaRapidaChecks {
+
+    private static final String CORE = "src/main/java/Core/";
 
     private static int fallos = 0;
 
@@ -32,18 +34,20 @@ public final class PausaRapidaChecks {
     // ---- M congela, P abre el menu ---------------------------------------
     private static void laMFreezaYLaPAbreElMenu() throws Exception {
         System.out.println("== M congela, P abre el menu ==");
-        String main = leer();
+        String main = leer("GameLoop.java");
 
         ok(main.contains("private static boolean frozen = false;"),
                 "hay un estado de congelado propio, separado del estado de pausa");
         ok(main.contains("private static void freezeGame()"), "congelar tiene su propia funcion");
         ok(main.contains("private static void unfreezeGame()"), "y tambien quitarla");
 
-        // La M tiene que alternar entre los dos, no llamar a la pausa.
-        int m = main.indexOf("GLFW_KEY_M");
+        // La M se lee en InputHandler y tiene que alternar el congelado, no
+        // llamar a la pausa con menu.
+        String input = leer("InputHandler.java");
+        int m = input.indexOf("GLFW_KEY_M");
         ok(m > 0, "la M se sigue leyendo");
-        String bloqueM = main.substring(m, main.indexOf("// P pausa", m));
-        ok(bloqueM.contains("frozen"), "la M decide con el estado de congelado");
+        String bloqueM = input.substring(m, input.indexOf("// P pausa", m));
+        ok(bloqueM.contains("toggleFreeze()"), "la M alterna el estado de congelado");
         ok(!bloqueM.contains("pauseGame()"), "y no llama a la pausa: no aparece el menu");
 
         // El raton: al congelar se suelta, al volver se fija.
@@ -54,7 +58,7 @@ public final class PausaRapidaChecks {
         ok(!freeze.contains("state = GameState."), "congelar no cambia el estado de la partida");
 
         String unfreeze = main.substring(main.indexOf("private static void unfreezeGame()"),
-                main.indexOf("private static void pauseGame()"));
+                main.indexOf("private static void toggleFreeze()"));
         ok(unfreeze.contains("gameTimer.resume()"), "al volver el tiempo sigue donde estaba");
         ok(unfreeze.contains("mouseController.setCaptured(true)"), "y el raton se vuelve a fijar");
         ok(unfreeze.contains("frozen = false"), "el congelado se quita al volver");
@@ -68,7 +72,7 @@ public final class PausaRapidaChecks {
     // ---- Congelado se ve igual que jugando ---------------------------------
     private static void congeladoNoCambiaLaPantalla() throws Exception {
         System.out.println("== congelado no cambia la pantalla ==");
-        String main = leer();
+        String main = leer("GameLoop.java");
 
         // El menu se dibuja con el estado PAUSED. Como congelar no cambia el
         // estado, el menu no puede aparecer por la via de congelar. El segundo
@@ -77,26 +81,25 @@ public final class PausaRapidaChecks {
         int switchRender = main.indexOf("switch (state) {", primerSwitch + 1);
         ok(switchRender > primerSwitch, "renderUI tiene el switch de las capas y el del contenido");
         String render = main.substring(switchRender, main.indexOf("default:", switchRender));
-        ok(render.contains("case PAUSED:") && render.contains("renderPauseMenu(w, h);"),
+        ok(render.contains("case PAUSED:") && render.contains("menus.renderPause("),
                 "el menu sigue dibujandose solo en PAUSED");
 
-        ok(main.contains("case PLAYING:") && main.contains("renderPlayingHud(w, h);"),
+        ok(main.contains("case PLAYING:") && main.contains("hud.render(w, h,"),
                 "congelado se dibuja como PLAYING: el nivel se ve entero");
 
-        int hud = main.indexOf("private static void renderPlayingHud");
-        String cuerpo = main.substring(hud, main.indexOf("private static void renderPauseMenu"));
-        ok(cuerpo.contains("\"P para el menu\""), "al jugar solo se anuncia la P");
-        ok(!cuerpo.contains("PAUSA RAPIDA") && !cuerpo.contains("Pulsa M para volver"),
+        String hud = leer("HudRenderer.java");
+        ok(hud.contains("\"P para el menu\""), "al jugar solo se anuncia la P");
+        ok(!hud.contains("PAUSA RAPIDA") && !hud.contains("Pulsa M para volver"),
                 "congelado no sale ningun aviso en pantalla");
-        ok(!cuerpo.contains("M para liberar") && !cuerpo.contains("M para seguir"),
+        ok(!hud.contains("M para liberar") && !hud.contains("M para seguir"),
                 "la M no se anuncia en el HUD: es un atajo propio");
-        ok(!cuerpo.contains("renderPauseMenu"), "y el menu no se dibuja nunca desde el HUD");
+        ok(!hud.contains("renderPause"), "y el menu no se dibuja nunca desde el HUD");
     }
 
     // ---- Congelado no simula nada ------------------------------------------
     private static void noSeSimulaNadaCongelado() throws Exception {
         System.out.println("== congelado no simula nada ==");
-        String main = leer();
+        String main = leer("GameLoop.java");
 
         int update = main.indexOf("private static void update()");
         String cuerpo = main.substring(update, main.indexOf("private static void mainLoop()"));
@@ -107,7 +110,7 @@ public final class PausaRapidaChecks {
                 "los pasos tampoco suenan congelado");
 
         // Los tres llamados que mueven el juego tienen que quedar dentro del
-        // bloque congelado: camara, jugador y recogida.
+        // bloque congelado: camara, player y recogida.
         int ifNoFrozna = cuerpo.indexOf("state == GameState.PLAYING && !frozen");
         for (String que : new String[] { "mouseController.update()", "inputPlayer.update(deltaTime)",
                 "dungeonManager.update(player.getPosition(), deltaTime)" }) {
@@ -130,31 +133,47 @@ public final class PausaRapidaChecks {
     // ---- La pausa de menu sigue en la P -----------------------------------
     private static void elMenuSigueEnLaP() throws Exception {
         System.out.println("== la pausa de menu sigue en la P ==");
-        String main = leer();
-        int p = main.indexOf("GLFW_KEY_P");
+        String input = leer("InputHandler.java");
+        int p = input.indexOf("GLFW_KEY_P");
         ok(p > 0, "la P se sigue leyendo");
-        String bloqueP = main.substring(p, main.indexOf("switch (state)", p));
+        String bloqueP = input.substring(p, input.indexOf("switch (state)", p));
         ok(bloqueP.contains("pauseGame()"), "la P abre la pausa con menu");
         ok(bloqueP.contains("resumeGame()"), "y la reanuda");
 
-        // La M se explica en el menu de pausa, que es donde se la puede usar sin que
-// estorbe, pero no en el HUD ni en el titulo.
-        int menu = main.indexOf("private static void renderPauseMenu");
-        String cuerpoMenu = main.substring(menu, main.indexOf("private static void renderTitleScreen"));
-        ok(cuerpoMenu.contains("M - Libera raton"), "el menu de pausa explica la M");
+        // Las pistas de teclado se han movido a la pantalla de Configuracion: el
+        // menu de pausa y el titulo ya no las llevan. La M sigue siendo un atajo
+        // del juego, pero solo se anuncia en la lista de controles.
+        String menus = leer("MenuScreens.java");
+        int menu = menus.indexOf("void renderPause(");
+        String cuerpoMenu = menus.substring(menu, menus.indexOf("void renderTitle("));
+        ok(!cuerpoMenu.contains("M - Libera raton"),
+                "el menu de pausa ya no lleva las pistas de teclado");
 
-        int titulo = main.indexOf("private static void renderTitleScreen");
-        String cuerpoTitulo = main.substring(titulo, main.indexOf("private static void drawToast"));
+        int controles = menus.indexOf("CONTROLES");
+        ok(controles > 0, "la lista de controles sigue declarada");
+        String listaControles = menus.substring(controles, menus.indexOf("};", controles));
+        ok(listaControles.contains("M - Libera raton"),
+                "la M se anuncia en la lista de controles");
+        int config = menus.indexOf("void renderConfig(");
+        String cuerpoConfig = menus.substring(config, menus.indexOf("void cleanup("));
+        ok(cuerpoConfig.contains("for (String linea : CONTROLES)"),
+                "y esas pistas se dibujan solo en la pantalla de Configuracion");
+
+        int titulo = menus.indexOf("void renderTitle(");
+        String cuerpoTitulo = menus.substring(titulo, menus.indexOf("private void centeredText"));
         ok(!cuerpoTitulo.contains("M - Libera"), "el titulo no anuncia la M");
 
-        ok(!main.contains("M / P - Menu") && !main.contains("M/P - Menu"),
+        String todo = leer("GameLoop.java") + leer("InputHandler.java") + leer("MenuScreens.java")
+                + leer("HudRenderer.java");
+        ok(!todo.contains("M / P - Menu") && !todo.contains("M/P - Menu"),
                 "no queda ninguna pista que siga diciendo que M abre el menu");
-        ok(!main.contains("Presiona M para abrir el menu"), "ni el aviso viejo del HUD");
+        ok(!todo.contains("Presiona M para abrir el menu"), "ni el aviso viejo del HUD");
+        ok(!todo.contains("TITLE_PISTA"), "y no quedan las pistas del titulo");
     }
 
     // ---- Utilidades -------------------------------------------------------
-    private static String leer() throws Exception {
-        return Files.readString(Paths.get("src/main/java/main/Main.java"));
+    private static String leer(String archivo) throws Exception {
+        return Files.readString(Paths.get(CORE + archivo));
     }
 
     private static void ok(boolean condicion, String que) {

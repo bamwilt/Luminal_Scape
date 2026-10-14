@@ -33,6 +33,11 @@ uniform vec3 u_fogColor;        // color del horizonte: el destino de la niebla
 // resto del escenario la manda a cero.
 uniform float u_emission;
 
+// Ajuste de vista del jugador (Configuracion). Se aplica a la superficie antes
+// de la niebla.
+uniform float u_brillo;
+uniform float u_contraste;
+
 // Luces puntuales: las placas '◉' y las llaves. Se acumulan al difuso global
 // con caida por distancia, y solo llegan las u_lightCount mas cercanas a la
 // camara (el mapa entero no cabe en el array).
@@ -94,6 +99,11 @@ void main()
     } else {
         FragColor = vec4(color + color * u_emission, 1.0);
     }
+
+    // Contraste alrededor del gris medio y luego brillo. Va antes de la niebla
+    // para que el fondo siga fundiendose con el color del horizonte del cielo.
+    FragColor.rgb = (FragColor.rgb - vec3(0.5)) * u_contraste + vec3(0.5);
+    FragColor.rgb = clamp(FragColor.rgb * u_brillo, 0.0, 1.0);
 
     // Niebla con margen cercano y curva cubica: 0 hasta u_fogNear, y de ahi
     // sube despacio para que el campo cercano (el suelo que pisas y el

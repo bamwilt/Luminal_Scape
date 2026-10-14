@@ -1,14 +1,13 @@
 package Render3D.item;
 
-import org.joml.Vector3f;
-
 import Render3D.graphics.PropMesh;
 import Render3D.map.MapConfig;
+import org.joml.Vector3f;
 
 /**
  * La llave: el item que aparece en las celdas {@code ◈} de los mapas.
  *
- * <p>Solo declara que recurso usa y a que escala. El giro y el flotado son los
+ * <p>Solo declara que recurso usa y a que scale. El giro y el flotado son los
  * del mapa ({@link MapConfig#ITEM_SPIN_SPEED}), no numeros inventados aqui, para
  * que cambiar la sensacion del item se siga haciendo en un unico sitio.
  */
@@ -18,7 +17,7 @@ public final class ItemKey extends Item {
     public static final String MODEL = "models/items/Key.glb";
 
     /**
-     * El GLB mide 0,87 m en Z, casi media celda. A escala 1 la llave se perdia
+     * El GLB mide 0,87 m en Z, casi media celda. A scale 1 la llave se perdia
      * entre la decoracion, y se subio a 2,2 para que se viera, con lo cual
      * ocupaba la celda entera y parecia un mueble. Con 1,2 mide cerca de 1 m:
      * se distingue girando, sin tapar el suelo alrededor.

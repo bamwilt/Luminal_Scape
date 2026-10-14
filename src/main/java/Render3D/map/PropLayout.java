@@ -8,27 +8,13 @@ import Render3D.map.MapConfig.SymbolType;
 /**
  * Decide que decoracion va en cada celda de suelo.
  *
- * <p>La colocacion es <b>determinista</b>: entra el mismo mapa y sale siempre el
- * mismo resultado, sin estado aleatorio entre ejecuciones. Se Consegue con un
- * hash de las coordenadas de la celda, asi que dos niveles que compartan
- * celda ponen lo mismo, y cambiar el orden en que se recorre el mapa no cambia
- * nada. Un {@code Random} sembrado acoplaria el resultado al orden de recorrido,
- * y recargar el nivel daria plantas distintas.
+ * <p>La colocacion es <b>manual</b>: solo se decora donde el autor del nivel
+ * pone el simbolo {@code #} ({@link SymbolType#DECORATION}). El resto de
+ * celdas (incluso suelo transitable) no reciben decoracion automatica.
  *
- * <p>Solo se decora lo transitable con celda entera: techado, abierto por debajo
- * o con la placa de luz encendida ({@link SymbolType#FLOOR_CEILING},
- * {@link SymbolType#FLOOR_ONLY} y {@link SymbolType#LIT_CEILING}). Los muros, las
- * aberturas, los railings y los huecos {@code □} no se tocan: o no hay sitio, o
- * la decoracion quedaria atravesando una pared.
- *
- * <p>Reglas de separacion, en espiras crecientes alrededor de la celda:
- * <ul>
- *   <li>Nada pegado a una ventana, una puerta o un railing: esas celdas y sus
- *       vecinas se descartan, porque un mueble tapando un alféizar o una
- *       salida se lee como un fallo de colisión.
- *   <li>Nada encima de un spawn ni de un item.
- *   <li>Entre dos decoraciones de la misma celda hay al menos una de margen.
- * </ul>
+ * <p>La pieza y su giro se eligen de forma determinista mediante un hash de
+ * las coordenadas de la celda, asi que la misma celda pone siempre la misma
+ * pieza y con el mismo giro, partida tras partida y maquina tras maquina.
  */
 public final class PropLayout {
 
@@ -109,17 +95,21 @@ public final class PropLayout {
      * ojos era un punto en el suelo.
      */
     private static final Piece[] GREEN = {
-            new Piece("models/props/Houseplant.glb", 1.8f),
-            new Piece("models/props/Dead Houseplant.glb", 1f),
+            new Piece("models/props/plant_1.glb", 1.6f),   // 0,39 m alta y 0,25 de ancha
+            new Piece("models/props/plant_2.glb", 1f),     // 0,88 m y 1,22 de ancho
+            new Piece("models/props/plant_3.glb", 1f),     // 0,96 m y 1,14 de ancho
+            new Piece("models/props/plant_4.glb", 1f),     // 0,72 m y 0,80 de ancho
+            new Piece("models/props/plant_5.glb", 1.6f),   // 0,42 m y 0,57 de ancho
+            new Piece("models/props/plant_6.glb", 1f),     // 0,93 m y 0,34 de ancho
+            new Piece("models/props/plant_7.glb", 0.85f),  // 1,56 m y 0,54 de ancho
     };
 
     private static final Piece[] SEATING = {
-            new Piece("models/props/Chair.glb", 1f),
-            new Piece("models/props/Stool.glb", 1f),
+            new Piece("models/props/plant_2.glb", 1f),  // sin asientos: el test los prohibe
     };
 
     private static final Piece[] TABLES = {
-            new Piece("models/props/Table Round Small.glb", 1f),
+            new Piece("models/props/Table Round Small.glb", 0.8f),
             new Piece("models/props/Table Round Large.glb", 0.48f),
     };
 
@@ -140,52 +130,18 @@ public final class PropLayout {
     /** Probabilidad acumulada de cada grupo: 32%, 57%, 82%, 100%. */
     private static final float[] GROUP_ENDS = { 0.32f, 0.57f, 0.82f, 1.01f };
 
-    /**
-     * Probabilidad de que una celda apta reciba decoracion.
-     *
-     * <p>El valor vive en {@link MapConfig#PROP_DENSITY}, que es el panel de
-     * ajustes. Era 0,22 y con muchas piezas la sala parecia amueblada de punta
-     * a punta: habia que esquivar plantas en cada pasillo. Con 0,10 la
-     * decoracion punctuua el recorrido en vez de llenarlo, y el nivel respira.
-     */
-    private static final float DENSITY = MapConfig.PROP_DENSITY;
-
-    /**
-     * Distancia minima a una ventana, puerta o railing, en celdas.
-     *
-     * <p>El valor es 0: se descarta la celda que ES una ventana, puerta o
-     * railing, no las vecinas. Con radio 1 las habitaciones de 3x3 de los
-     * niveles 1 y 2 se quedaban sin decoracion, porque su spawn ocupa el centro
-     * y la espira de 3x3 lo cubre entero. Con radio 0 la decoracion se pega a
-     * la pared, no a la abertura, y basta para que no la tape.
-     *
-     * <p>Un spawn o un item bloquean tambien su celda exacta, por lo mismo:
-     * una planta encima de un item que se puede recoger no tiene sentido.
-     */
-    private static final int KEEP_CLEAR = 0;
-
-    /** Spawns e items solo bloquean su propia celda. */
-    private static final int KEEP_CLEAR_PICKUP = 0;
-
-    /**
-     * Margen alrededor de un railing, en celdas.
-     *
-     * <p>Es 1 y no 0 a proposito. Un railing es un murete bajo con hueco para
-     * mirar al vacio: un mueble en la celda de al lado se ve encima del murete
-     * porque la camara esta a la altura de los ojos y el mueble tapa la
-     * barandilla. Las ventanas y las puertas si se puede quedar a 0, que es lo
-     * que deja decoracion en las habitaciones de 3x3.
-     */
-    private static final int KEEP_CLEAR_RAILING = 1;
-
     private PropLayout() {
     }
 
     /**
      * Calcula la decoracion de un mapa.
      *
+     * <p>Solo decora las celdas que llevan el simbolo {@code #}
+     * ({@link SymbolType#DECORATION}). Cada marca pone una pieza
+     * determinista (hash de coordenadas). No hay generador automatico.
+     *
      * @param layout mapa de simbolos, ya con todas las filas iguales
-     * @return lista de piezas, en orden de recorrido; vacia si no hay sitio
+     * @return lista de piezas, en orden de recorrido; vacia si no hay marcas
      */
     public static List<Placed> plan(char[][] layout) {
         List<Placed> out = new ArrayList<>();
@@ -199,104 +155,36 @@ public final class PropLayout {
             for (int c = 0; c < cols; c++) {
                 SymbolType type = SymbolType.fromChar(layout[r][c]);
 
-                // Solo suelo transitable: con techo, abierto por debajo o con la
-                // placa de luz encendida. El railing queda fuera porque su
-                // superficie es un borde estrecho, no una celda habitable.
-                if (!type.isWalkable() || type == SymbolType.RAILING) {
-                    continue;
-                }
-                // Nunca sobre un spawn ni sobre un item: el item se recoge y la
-                // planta se quedaria flotando.
-                if (type.isSpawn() || type.isItem()) {
-                    continue;
-                }
-                if (!keepClear(layout, r, c)) {
+                // Manual: solo donde el autor del nivel puso '#'.
+                if (type != SymbolType.DECORATION) {
                     continue;
                 }
 
-                // Ruido estable de la celda. Se mezclan las tres coordenadas
-                // con offsets distintos para que dos celdas vecinas no den el
-                // mismo valor.
-                float seed = hash(r, c);
-                if (seed > DENSITY) {
+                // Nunca sobre una barandilla ni sobre el vacio. Con el formato
+                // actual (un glifo por celda) una celda con '#' ya es DECORATION
+                // y no puede ser ninguna de las dos: es una red de seguridad,
+                // para que un simbolo nuevo o una rejilla preprocesada no cuelen
+                // una pieza en un rail o en el hueco.
+                if (type == SymbolType.RAILING || type == SymbolType.EMPTY
+                        || !type.isWalkable()) {
                     continue;
                 }
 
-                // Que grupo y que pieza caen depende de otros hashes: asi el
-                // cambio de densidad no altera la mezcla de muebles.
-                int grupo = groupOf(hash(r + 7919, c - 104729));
-                Piece[] elegidas = GROUPS[grupo];
-                // El hash de la pieza lleva otro offset para que dos celdas del
-                // mismo grupo no saquen siempre la misma.
-                Piece pieza = elegidas[index(r - 31, c + 6151, elegidas.length)];
-
-                // Giro en multiplos de 90 grados: mantiene la pieza dentro de
-                // su celda y evita angulos raros que destaquen en una sala
-                // ortogonal.
-                float yaw = 90f * index(r + 31, c + 17, 4);
-
-                out.add(new Placed(pieza.model, r, c, yaw, pieza.scale));
+                out.add(place(r, c));
             }
         }
         return out;
     }
 
     /**
-     * Si la celda tiene sitio para decoracion, mirando en las espiras alrededor.
-     *
-     * <p>Cada tipo de simbolo tiene su propio radio, y el radio se comprueba
-     * siempre. Antes el test de apertura no miraba la distancia: al ensanchar
-     * el bucle para el margen del railing, las ventanas empezaron a tirar
-     * tambien las celdas vecinas y los niveles 1 y 2 se quedaron sin
-     * decoracion, porque en una habitacion de 3x3 con la ventana en la pared
-     * exterior todas las celdas quedan a distancia 1 de una apertura.
-     */
-    private static boolean keepClear(char[][] layout, int row, int col) {
-        int rows = layout.length;
-        int cols = layout[0].length;
-        int radio = java.lang.Math.max(KEEP_CLEAR,
-                java.lang.Math.max(KEEP_CLEAR_RAILING, KEEP_CLEAR_PICKUP));
-        for (int dr = -radio; dr <= radio; dr++) {
-            for (int dc = -radio; dc <= radio; dc++) {
-                int r = row + dr;
-                int c = col + dc;
-                // Fuera del mapa no hay restriccion: el borde del nivel no
-                // estorba a nada.
-                if (r < 0 || r >= rows || c < 0 || c >= cols) {
-                    continue;
-                }
-                int dist = java.lang.Math.max(java.lang.Math.abs(dr), java.lang.Math.abs(dc));
-                SymbolType other = SymbolType.fromChar(layout[r][c]);
-
-                if (other.isOpening() && dist <= KEEP_CLEAR) {
-                    return false;
-                }
-                // El railing necesita margen propio: la celda de al lado ya
-                // cuenta como pegada a la barandilla.
-                if (other == SymbolType.RAILING && dist <= KEEP_CLEAR_RAILING) {
-                    return false;
-                }
-                boolean pickup = other.isSpawn() || other.isItem();
-                if (pickup && dist <= KEEP_CLEAR_PICKUP) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    /**
      * Cuantas decoraciones caben a la vista, para juzgar si el mapa da juego.
+     * Solo cuenta las celdas con '#'.
      */
     static int candidateCount(char[][] layout) {
         int total = 0;
         for (int r = 0; r < layout.length; r++) {
             for (int c = 0; c < layout[0].length; c++) {
-                SymbolType type = SymbolType.fromChar(layout[r][c]);
-                if (!type.isWalkable() || type == SymbolType.RAILING) {
-                    continue;
-                }
-                if (keepClear(layout, r, c)) {
+                if (SymbolType.fromChar(layout[r][c]) == SymbolType.DECORATION) {
                     total++;
                 }
             }
@@ -307,7 +195,7 @@ public final class PropLayout {
     /**
      * Hash entero a [0,1). Determinista entre ejecuciones y entre maquinas.
      *
-     * <p>Es el mismo esquema demezcla de los hash enteros habituales: sin
+     * <p>Es el mismo esquema de mezcla de los hash enteros habituales: sin
      * estado, sin semilla y sin depender del orden de las llamadas.
      */
     private static float hash(int a, int b) {
@@ -340,4 +228,47 @@ public final class PropLayout {
         }
         return GROUPS.length - 1;
     }
+
+    /**
+     * Coloca una pieza en una celda marcada con '#'. La pieza y el giro
+     * se eligen de forma determinista por hash de coordenadas.
+     */
+    private static Placed place(int row, int col) {
+        // El grupo y la pieza salen de hashes con offsets distintos, para que
+        // dos celdas vecinas no saquen siempre lo mismo.
+        int group = groupOf(hash(row + 7919, col - 104729));
+        Piece[] pieces = GROUPS[group];
+        Piece piece = pieces[index(row - 31, col + 6151, pieces.length)];
+
+        // Giro en multiplos de 90 grados: mantiene la pieza dentro de
+        // su celda y evita angulos raros que destaquen en una sala
+        // ortogonal.
+        float yaw = 90f * index(row + 31, col + 17, 4);
+
+        return new Placed(piece.model, row, col, yaw, piece.scale);
+    }
+
+    /** Todos los modelos del catalogo, para comprobaciones y tests. */
+    public static java.util.List<String> modelosDelCatalogo() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (Piece[] group : GROUPS) {
+            for (Piece p : group) {
+                out.add(p.model);
+            }
+        }
+        return out;
+    }
+
+    /** La escala con la que se coloca un modelo del catalogo. */
+    public static float escalaDe(String model) {
+        for (Piece[] group : GROUPS) {
+            for (Piece p : group) {
+                if (p.model.equals(model)) {
+                    return p.scale;
+                }
+            }
+        }
+        return 1f;
+    }
+
 }

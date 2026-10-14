@@ -1,13 +1,11 @@
 package Render3D.map;
 
+import Render3D.map.MapConfig.SymbolType;
+import Render3D.mesh.MeshBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-
 import org.joml.Vector3f;
-
-import Render3D.map.MapConfig.SymbolType;
-import Render3D.mesh.MeshBuilder;
 
 /**
  * Comprobaciones headless del techo con luz ({@code ◉}) y de las luces
@@ -28,7 +26,7 @@ import Render3D.mesh.MeshBuilder;
  *   <li>El techo normal NO contiene las placas: si compartieran malla, el
  *       brillo se le saldría a todo el techo del nivel.</li>
  *   <li>{@link DungeonManager#collectLights} devuelve las más cercanas al
- *       jugador, descarta las lejanas y no se pasa del array del shader.</li>
+ *       player, descarta las lejanas y no se pasa del array del shader.</li>
  *   <li>El {@code #define MAX_LIGHT_COUNT} de los shaders coincide con
  *       {@link MapConfig#MAX_LIGHT_COUNT}, que es el único sitio editable.</li>
  * </ol>

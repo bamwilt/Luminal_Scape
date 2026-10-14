@@ -1,9 +1,10 @@
 package Render3D.map;
 
 import Render3D.mesh.Box;
-
+import java.util.List;
 import java.util.List;
 
+import java.util.List;
 /**
  * Plantilla base para aberturas en un muro (ventanas y puertas). Una abertura
  * se dibuja como paneles apilados a alturas configurables:
@@ -12,7 +13,7 @@ import java.util.List;
  *   <li>Pared superior (dintel): desde {@code header} hasta el tope del muro.</li>
  * </ul>
  * El hueco entre ambas deja pasar la vista (y, si la pared inferior es mínima,
- * el paso del jugador).
+ * el paso del player).
  *
  * <p>Las plantillas devuelven CAJAS en coordenadas de mundo, no mallas: el
  * {@link Render3D.mesh.MeshBuilder} las vuelca todas en la misma malla de la

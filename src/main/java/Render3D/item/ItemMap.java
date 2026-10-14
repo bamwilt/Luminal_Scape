@@ -1,9 +1,8 @@
 package Render3D.item;
 
-import org.joml.Vector3f;
-
 import Render3D.graphics.PropMesh;
 import Render3D.map.MapConfig;
+import org.joml.Vector3f;
 
 /**
  * El mapa: el item de las celdas {@code ☑}.
@@ -14,7 +13,7 @@ import Render3D.map.MapConfig;
  * {@link ItemTime}, porque ahí el minimapa ya viene activado de salida y el mapa
  * no tendria nada que revelar.
  *
- * <p>Como {@link ItemKey}, solo declara su recurso y su escala: el giro y el
+ * <p>Como {@link ItemKey}, solo declara su recurso y su scale: el giro y el
  * flotado son los del mapa, para que la sensacion de los items se cambie en un
  * unico sitio.
  */

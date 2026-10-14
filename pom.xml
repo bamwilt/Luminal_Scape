@@ -9,7 +9,7 @@
         <lwjgl.version>3.3.6</lwjgl.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
-        <exec.mainClass>main.Main</exec.mainClass>
+        <exec.mainClass>Core.GameLoop</exec.mainClass>
     </properties>
     <dependencyManagement>
         <dependencies>

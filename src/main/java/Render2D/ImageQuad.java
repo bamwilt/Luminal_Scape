@@ -1,11 +1,9 @@
 package Render2D;
 
-import UtilsRender.Shader;
-import UtilsRender.TextureLoader;
-import org.lwjgl.BufferUtils;
-
+import Render3D.Shader;
+import Render3D.TextureLoader;
 import java.nio.FloatBuffer;
-
+import org.lwjgl.BufferUtils;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.*;
@@ -18,7 +16,7 @@ import static org.lwjgl.opengl.GL30.*;
  *
  * <p>La altura se calcula a partir de la anchura pedida y de la proporción
  * original de la imagen ({@link #getAspectRatio()}), así el logo nunca se
- * deforma al cambiar el tamaño de la ventana.
+ * deforma al cambiar el tamaño de la window.
  */
 public class ImageQuad {
 
@@ -113,7 +111,7 @@ public class ImageQuad {
         glDisable(GL_BLEND);
     }
 
-    /** Centrada horizontalmente en la ventana, con la parte superior en {@code y}. */
+    /** Centrada horizontalmente en la window, con la parte superior en {@code y}. */
     public void drawCentered(float y, float w, int windowWidth, int windowHeight, float alpha) {
         draw((windowWidth - w) / 2f, y, w, heightForWidth(w), windowWidth, windowHeight, alpha);
     }

@@ -1,5 +1,6 @@
 package Render3D.graphics;
 
+import Render3D.Json;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -8,11 +9,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-
-import UtilsRender.Json;
 
 /**
  * Lector minimo de archivos GLB (glTF binario).
@@ -99,6 +97,43 @@ public final class GlbModel {
             }
         }
         return max;
+    }
+
+    /**
+     * Y mas baja del modelo en metros, ya escalada.
+     *
+     * <p>Es 0 si el modelo nace apoyado en su origen, y negativo si lo que trae
+     * el archivo se mete bajo el suelo. Ver {@link #groundOnFloor()}.
+     */
+    public float baseMeters() {
+        float min = Float.MAX_VALUE;
+        for (Part part : parts) {
+            for (int i = 1; i < part.positions.length; i += 3) {
+                min = Math.min(min, part.positions[i]);
+            }
+        }
+        return parts.isEmpty() ? 0f : min;
+    }
+
+    /**
+     * Deja el modelo apoyado en su origen: sube lo justo para que su punto mas
+     * bajo quede en Y=0.
+     *
+     * <p>Los GLB del pack no traen el origen en el suelo, cada uno donde le dio
+     * la gana al que los exporto. Medidos: la mesa redonda pequena nace 6,3 cm
+     * por debajo del suelo y el taburete 0,9 cm, asi que esas dos se veian
+     * hundidas al colocarlas sobre el panel. Corregirlo aqui, y no con un
+     * desplazamiento a mano por pieza en el plan, es lo que hace que un modelo
+     * nuevo entre bien sin que nadie tenga que acordarse de medirlo.
+     *
+     * <p>Es idempotente: llamarlo dos veces no mueve el modelo la segunda.
+     */
+    public void groundOnFloor() {
+        float min = baseMeters();
+        if (min == 0f || min == Float.MAX_VALUE) {
+            return;
+        }
+        applyTransform(new Matrix4f().translate(0f, -min, 0f));
     }
 
     /** Radio maximo en metros, para comprobar que cabe en una celda. */

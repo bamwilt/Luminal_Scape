@@ -1,12 +1,11 @@
 package Render3D.collision;
 
-import org.joml.Vector3f;
-
 import java.util.ArrayList;
 import java.util.List;
+import org.joml.Vector3f;
 
 /**
- * Comprueba si el jugador entra en algún volumen sólido del nivel.
+ * Comprueba si el player entra en algún volumen sólido del nivel.
  *
  * <p>Los volúmenes son {@link Aabb} en coordenadas de mundo y no dependen de
  * cómo se dibuje la geometría: la malla de la mazmorra se agrupa en un único
@@ -19,7 +18,7 @@ import java.util.List;
  *
  * <p><b>La posición que recibe son los PIES</b>, no el ojo de la cámara: la caja
  * va de {@code (y, y + altura)} hacia arriba. Si se pasara la posición de la
- * cámara, todo el cuerpo quedaría desplazado por la altura del ojo y el jugador
+ * cámara, todo el cuerpo quedaría desplazado por la altura del ojo y el player
  * no cabría de pie bajo ningún dintel de puerta.
  */
 public class CollisionManager {

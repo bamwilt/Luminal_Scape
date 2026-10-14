@@ -1,5 +1,6 @@
 package Render3D.mesh;
 
+
 /**
  * Referencia de coordenadas usada al calcular las UV de cada cara.
  *

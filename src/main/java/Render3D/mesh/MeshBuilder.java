@@ -1,7 +1,9 @@
 package Render3D.mesh;
 
 import java.util.Arrays;
+import java.util.Arrays;
 
+import java.util.Arrays;
 /**
  * Acumulador de geometría: posiciones, normales y UVs de todas las cajas que
  * compondrán una misma malla. Al terminar se sube una sola vez a un

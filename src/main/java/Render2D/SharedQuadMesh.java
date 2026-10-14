@@ -1,11 +1,9 @@
 package Render2D;
 
-import UtilsRender.Shader;
+import Render3D.Shader;
+import java.nio.FloatBuffer;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL30;
-
-import java.nio.FloatBuffer;
-
 import static org.lwjgl.opengl.GL11.GL_FLOAT;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.*;
@@ -36,7 +34,7 @@ public class SharedQuadMesh {
         shader = new Shader(VERTEX_SHADER, FRAGMENT_SHADER);
     }
 
-    public void draw(float x, float y, int width, int height,
+    public void draw(float x, float y, float width, float height,
             int windowWidth, int windowHeight, int[] rgbaColor, float cornerRadius) {
         float[] vertices = new float[]{
             x, y,

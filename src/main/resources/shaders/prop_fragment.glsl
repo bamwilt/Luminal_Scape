@@ -25,6 +25,11 @@ uniform vec3 u_lightColor[MAX_LIGHT_COUNT];
 uniform float u_attenLinear;
 uniform float u_attenQuadratic;
 
+// Ajuste de vista del jugador (Configuracion). Se aplica a la superficie antes
+// de la niebla.
+uniform float u_brillo;
+uniform float u_contraste;
+
 void main()
 {
     // Los modelos no traen textura: el color plano del material se pinta tal
@@ -63,6 +68,11 @@ void main()
 
     // Misma niebla que el muro: mismo margen cercano y misma curva, para que
     // un mueble cercano no se vea mas nitido que el pasillo que lo rodea.
+    // Contraste alrededor del gris medio y luego brillo. Va antes de la niebla
+    // para que el fondo siga fundiendose con el color del horizonte del cielo.
+    FragColor.rgb = (FragColor.rgb - vec3(0.5)) * u_contraste + vec3(0.5);
+    FragColor.rgb = clamp(FragColor.rgb * u_brillo, 0.0, 1.0);
+
     float dist = length(viewPos - FragPos);
     float near = u_fogNear;
     float span = max(u_viewDistance - near, 0.001);

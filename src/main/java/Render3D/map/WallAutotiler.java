@@ -4,7 +4,6 @@ import Render3D.collision.Aabb;
 import Render3D.mesh.BlockType;
 import Render3D.mesh.MeshBuilder;
 import Render3D.mesh.WallBitmask;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -145,7 +144,7 @@ public final class WallAutotiler {
     // Consulta de la máscara de vecinos
     // ------------------------------------------------------------------
 
-    /** ¿La casilla conecta con los muros vecinos? (muro, ventana o puerta) */
+    /** ¿La casilla conecta con los muros vecinos? (muro, window o puerta) */
     public boolean isWall(int r, int c) {
         return inBounds(r, c) && connects(grid[r][c]);
     }

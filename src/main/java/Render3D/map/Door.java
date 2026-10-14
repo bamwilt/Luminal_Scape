@@ -1,12 +1,11 @@
 package Render3D.map;
 
 import Render3D.mesh.Box;
-
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Plantilla de puerta: una ventana cuya pared inferior es mínima (prácticamente
+ * Plantilla de puerta: una window cuya pared inferior es mínima (prácticamente
  * nula) y cuya superior es ajustable, dejando todo el hueco transitable.
  * Al agacharse se pasa; de pie el dintel bloquea.
  *

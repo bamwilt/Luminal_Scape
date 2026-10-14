@@ -15,7 +15,6 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-
 import org.joml.Vector3f;
 
 /**
@@ -30,10 +29,12 @@ import org.joml.Vector3f;
  *   map:
  *   ‣...fila con glifos...
  * </pre>
- * Las líneas en blanco y las que empiezan por '#' se ignoran. Tras la línea
- * {@code map:} todo lo que sigue son filas del mapa (glifos de
- * {@link MapConfig.SymbolType}); las filas se rellenan con espacios hasta el
- * ancho máximo para garantizar una grilla rectangular.
+ * Las líneas en blanco y las que empiezan por '#' ANTES de {@code map:} se
+ * ignoran (comentarios). Tras la línea {@code map:} todo lo que sigue son filas
+ * del mapa (glifos de {@link MapConfig.SymbolType}) y un {@code '#'} ahí ya no
+ * es un comentario sino la decoración ({@link MapConfig.SymbolType#DECORATION});
+ * las filas se rellenan con espacios hasta el ancho máximo para garantizar una
+ * grilla rectangular.
  *
  * El orden de juego es por NOMBRE DE ARCHIVO ({@code level_01.txt} primero,
  * comparación por números), no por una directiva interna. La directiva
@@ -53,6 +54,18 @@ public final class LevelLoader {
     private static final String LEVEL_TYPES_DIR = "level_types";
     private static final String SYMBOLS_FILE = "symbolsLevel.txt";
 
+    /**
+     * Nivel de pruebas: se guarda de la partida, pero sigue en {@code levels/}.
+     *
+     * <p><b>Secreto, a proposito.</b> No aparece en el selector ni en la
+     * pantalla de titulo, y no hay ninguna pista en el juego que lo anuncie: solo
+     * sale si se pide explicitamente con {@link #listLevels(boolean)}. Es una
+     * mesa de trabajo para probar simbolos y reglas, no un nivel del juego, asi
+     * que dejarlo en la lista solo hacia que alguien se lo encontrara al
+     * recorrer los niveles. Tampoco se documenta fuera del codigo.
+     */
+    public static final String TEST_LEVEL_FILE = "test_mapa.txt";
+
     /** Referencia a un nivel: su título, tiempo declarado y la ruta del recurso. */
     public static final class LevelInfo {
         public final String name;
@@ -70,13 +83,25 @@ public final class LevelLoader {
     }
 
     /**
-     * Enumera los niveles disponibles en {@code levels/} ordenados por nombre
-     * de archivo con comparación natural ({@code level_02.txt} antes que
-     * {@code level_10.txt}). Funciona en disco (dev) y empaquetado en jar.
-     * Excluye los símbolos del editor ({@code symbolsLevel.txt}). Si no hay
-     * ninguno, devuelve {@link #DEFAULT_LEVEL}.
+     * Enumera los niveles de la partida, ordenados por nombre de archivo con
+     * comparación natural ({@code level_02.txt} antes que {@code level_10.txt}).
+     * Funciona en disco (dev) y empaquetado en jar.
+     * Excluye los símbolos del editor ({@code symbolsLevel.txt}) y el
+     * {@link #TEST_LEVEL_FILE}. Si no hay ninguno, devuelve
+     * {@link #DEFAULT_LEVEL}.
      */
     public static LevelInfo[] listLevels() {
+        return listLevels(false);
+    }
+
+    /**
+     * Igual que {@link #listLevels()}, pero decide si el nivel de pruebas entra
+     * en la lista.
+     *
+     * @param incluirTest {@code true} para que {@link #TEST_LEVEL_FILE} aparezca
+     *                    en el selector; por defecto no aparece
+     */
+    public static LevelInfo[] listLevels(boolean incluirTest) {
         List<String> paths = new ArrayList<>();
         Enumeration<URL> resources;
         try {
@@ -91,6 +116,9 @@ public final class LevelLoader {
             } else if ("jar".equals(url.getProtocol())) {
                 listLevelsFromJar(url, paths);
             }
+        }
+        if (!incluirTest) {
+            paths.removeIf(p -> p.endsWith("/" + TEST_LEVEL_FILE));
         }
         if (paths.isEmpty()) {
             paths.add(DEFAULT_LEVEL);
@@ -407,8 +435,18 @@ public final class LevelLoader {
         return value;
     }
 
-    /** Todas las lineas posteriores a {@code map:}, sin comentarios. */
-    private static List<String> rowsAfterMap(List<String> lines) {
+    /**
+     * Todas las lineas posteriores a {@code map:}.
+     *
+     * <p>Tras {@code map:} ya no se descarta nada salvo las lineas en blanco: un
+     * {@code #} ahi es el glifo de decoracion ({@link MapConfig.SymbolType#DECORATION}),
+     * no un comentario, y tiene que llegar a la matriz. Los comentarios solo
+     * valen antes de {@code map:} (los ignora {@link #valueOf}).
+     *
+     * <p>Es {@code package-private} en vez de {@code private} para poder
+     * comprobarla de forma aislada en los tests headless.
+     */
+    static List<String> rowsAfterMap(List<String> lines) {
         List<String> rows = new ArrayList<>();
         boolean inMap = false;
         for (String line : lines) {
@@ -419,7 +457,7 @@ public final class LevelLoader {
                 }
                 continue;
             }
-            if (t.isEmpty() || t.startsWith("#")) {
+            if (t.isEmpty()) {
                 continue;
             }
             rows.add(stripTrailingWhitespace(line));

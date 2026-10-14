@@ -1,9 +1,10 @@
 package Player;
 
 import Render3D.map.MapConfig;
-
+import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.glfw.GLFW.*;
 
+import static org.lwjgl.glfw.GLFW.*;
 public class InputPlayer {
 
     private final long windowHandle;
@@ -53,6 +54,6 @@ public class InputPlayer {
         if (direccion == 0f) {
             return;
         }
-        player.getCamera().rotateYaw(direccion * MapConfig.KEY_YAW_SPEED * deltaTime);
+        player.getCamara().rotateYaw(direccion * MapConfig.KEY_YAW_SPEED * deltaTime);
     }
 }

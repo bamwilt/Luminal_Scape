@@ -1,5 +1,6 @@
 package Render3D.mesh;
 
+
 /**
  * Tipo de bloque de muro que corresponde a cada una de las 16 máscaras de
  * {@link WallBitmask}. Es la tabla "autotiling": a partir de los vecinos

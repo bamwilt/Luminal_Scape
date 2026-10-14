@@ -1,55 +1,51 @@
 package Render3D.map;
 
+import Render3D.Shader;
 import Render3D.collision.Aabb;
 import Render3D.collision.CollisionManager;
 import Render3D.graphics.GlbModel;
-import Render3D.item.Item;
+import Render3D.graphics.PropMesh;
+import Render3D.graphics.Wall;
 import Render3D.item.Item;
 import Render3D.item.ItemKey;
 import Render3D.item.ItemMap;
 import Render3D.item.ItemTime;
-import Render3D.graphics.PropMesh;
-import Render3D.graphics.Wall;
 import Render3D.mesh.BlockType;
 import Render3D.mesh.Box;
 import Render3D.mesh.Mesh;
 import Render3D.mesh.MeshBuilder;
-import UtilsRender.Shader;
-import org.joml.Vector3f;
-
-import org.joml.Matrix4f;
-
-import java.util.ArrayList;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static Render3D.map.MapConfig.SymbolType;
-import static Render3D.map.MapConfig.TILE_SIZE;
-import static Render3D.map.MapConfig.WALL_THICKNESS;
-import static Render3D.map.MapConfig.WALL_HEIGHT;
-import static Render3D.map.MapConfig.FLOOR_THICKNESS;
-import static Render3D.map.MapConfig.UV_SCALE;
-import static Render3D.map.MapConfig.ITEM_FLOAT_HEIGHT;
-import static Render3D.map.MapConfig.ITEM_PICKUP_RADIUS;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import static Render3D.map.MapConfig.CAMERA_HEIGHT;
+import static Render3D.map.MapConfig.FLOOR_THICKNESS;
+import static Render3D.map.MapConfig.ITEM_FLOAT_HEIGHT;
+import static Render3D.map.MapConfig.ITEM_LIGHT_B;
+import static Render3D.map.MapConfig.ITEM_LIGHT_G;
+import static Render3D.map.MapConfig.ITEM_LIGHT_INTENSITY;
+import static Render3D.map.MapConfig.ITEM_LIGHT_R;
+import static Render3D.map.MapConfig.ITEM_PICKUP_RADIUS;
+import static Render3D.map.MapConfig.LIGHT_CEILING_B;
+import static Render3D.map.MapConfig.LIGHT_CEILING_DROP;
+import static Render3D.map.MapConfig.LIGHT_CEILING_EMISSION;
+import static Render3D.map.MapConfig.LIGHT_CEILING_G;
+import static Render3D.map.MapConfig.LIGHT_CEILING_INTENSITY;
+import static Render3D.map.MapConfig.LIGHT_CEILING_R;
+import static Render3D.map.MapConfig.LIGHT_CULL_DISTANCE;
+import static Render3D.map.MapConfig.MAX_LIGHT_COUNT;
 import static Render3D.map.MapConfig.PROP_BASE_Y;
 import static Render3D.map.MapConfig.PROP_SCALE;
 import static Render3D.map.MapConfig.RAILING_THICKNESS;
-import static Render3D.map.MapConfig.LIGHT_CEILING_DROP;
-import static Render3D.map.MapConfig.LIGHT_CEILING_EMISSION;
-import static Render3D.map.MapConfig.LIGHT_CEILING_INTENSITY;
-import static Render3D.map.MapConfig.LIGHT_CEILING_R;
-import static Render3D.map.MapConfig.LIGHT_CEILING_G;
-import static Render3D.map.MapConfig.LIGHT_CEILING_B;
-import static Render3D.map.MapConfig.ITEM_LIGHT_INTENSITY;
-import static Render3D.map.MapConfig.ITEM_LIGHT_R;
-import static Render3D.map.MapConfig.ITEM_LIGHT_G;
-import static Render3D.map.MapConfig.ITEM_LIGHT_B;
-import static Render3D.map.MapConfig.LIGHT_CULL_DISTANCE;
-import static Render3D.map.MapConfig.MAX_LIGHT_COUNT;
+import static Render3D.map.MapConfig.SymbolType;
+import static Render3D.map.MapConfig.TILE_SIZE;
+import static Render3D.map.MapConfig.UV_SCALE;
+import static Render3D.map.MapConfig.WALL_HEIGHT;
+import static Render3D.map.MapConfig.WALL_THICKNESS;
 
 /**
  * Renderizador de mazmorras a partir de un mapa de texto.
@@ -67,7 +63,7 @@ import static Render3D.map.MapConfig.MAX_LIGHT_COUNT;
  * Tabla de símbolos (ver {@link MapConfig.SymbolType}):
  *   '■'  muro horizontal
  *   '◙'  muro vertical
- *   '▣'  ventana (ver {@link Window})
+ *   '▣'  window (ver {@link Window})
  *   '◧'  puerta (ver {@link Door})
  *   '◫'  piso y techo: dos paneles texturizados (abajo y arriba)
  *   '◉'  techo con luz: igual que '◫', pero el panel de arriba va a su propia
@@ -77,13 +73,13 @@ import static Render3D.map.MapConfig.MAX_LIGHT_COUNT;
  *   '◰'  railing: tramo de piso SIN techo con DOS muros bajos y finos
  *        ({@link MapConfig#RAILING_THICKNESS}) en sus bordes largos: una barra
  *        continua por segmento, extendida hasta los muros/puertas, más un
- *        colisionador oculto a toda altura para que el jugador no se pase (ver
+ *        colisionador oculto a toda altura para que el player no se pase (ver
  *        {@link Railing}); sus colisiones van en lista aparte
  *   '◈'  item: la llave, un modelo que flota a la altura de la cámara, rota y
- *        desaparece si el jugador pasa por su punto. No brilla por si misma:
+ *        desaparece si el player pasa por su punto. No brilla por si misma:
  *        deja una aureola dorada tenue alrededor (ver {@link
  *        MapConfig#ITEM_LIGHT_INTENSITY})
- *   '▲'/'▼'/'▶'/'◀'  spawn del jugador: la flecha indica hacia dónde mira
+ *   '▲'/'▼'/'▶'/'◀'  spawn del player: la flecha indica hacia dónde mira
  *   '□'/' '  vacío: no se construye nada (fácil de editar)
  *
  * <h2>Muros: autotiling por bitmask</h2>
@@ -107,7 +103,7 @@ import static Render3D.map.MapConfig.MAX_LIGHT_COUNT;
  *
  * Alineación flexible de ventanas y puertas: se recorren los 4 vecinos (N, S,
  * E, O) y se usa la orientación del PRIMER muro encontrado ('■' -> horizontal,
- * '◙' -> vertical); si el vecino es otra ventana o puerta, se copia su
+ * '◙' -> vertical); si el vecino es otra window o puerta, se copia su
  * orientación. Sin ninguna referencia, la celda se convierte en un muro
  * estándar. Esta regla aplica a ventanas y puertas.
  *
@@ -167,7 +163,7 @@ public class DungeonManager {
     private final List<Item> items = new ArrayList<>();
 
     /**
-     * Si el '☑' deja tiempo en vez de mapa. Lo fija Main segun la dificultad
+     * Si el '☑' deja tiempo en vez de mapa. Lo fija GameLoop segun la dificultad
      * antes de construir el nivel.
      */
     private boolean mapItemGivesTime = false;
@@ -178,7 +174,7 @@ public class DungeonManager {
      * modelo y la malla son solo como se dibuja.
      *
      * <p>Es estatico y no toca la GPU a proposito, para que la regla se pueda
-     * comprobar sin ventana.
+     * comprobar sin window.
      */
     public enum ItemKind {
         /** El '◈': da tiempo y cuenta para el total de artefactos. */
@@ -237,7 +233,7 @@ public class DungeonManager {
     /**
      * Instancia vacía, sin geometría y sin tocar la GPU. Existe para que las
      * pruebas puedan inspeccionar la geometría estática de un nivel con
-     * {@link #buildStaticGeometry} sin abrir una ventana de OpenGL; el juego
+     * {@link #buildStaticGeometry} sin abrir una window de OpenGL; el juego
      * siempre usa el constructor público.
      */
     DungeonManager() {
@@ -279,7 +275,7 @@ public class DungeonManager {
             this.y = y;
             this.z = z;
             this.yaw = yaw;
-            // La escala va en la matriz y no en el modelo, porque es por pieza:
+            // La scale va en la matriz y no en el modelo, porque es por pieza:
             // un mismo GLB puede aparecer a tamano real y a la mitad en celdas
             // distintas, y la malla de GPU se comparte entre ambas.
             this.transform.identity()
@@ -302,12 +298,16 @@ public class DungeonManager {
             PropMesh mesh = PROP_CACHE.get(placed.model);
             if (mesh == null) {
                 // La subida a GPU necesita contexto; si no lo hay se omite en
-                // vez de fallar, para que las pruebas sin ventana sigan.
+                // vez de fallar, para que las pruebas sin window sigan.
                 GlbModel model = GlbModel.load(placed.model);
                 if (model == null || !model.isSupported()) {
                     PROP_CACHE.put(placed.model, null);
                     continue;
                 }
+                // El modelo se apoya en su propio origen, no en el del archivo:
+                // los GLB del pack nacen a distintas alturas y sin corregir, la
+                // mesa se hundia 6 cm en el panel. Ver GlbModel.groundOnFloor.
+                model.groundOnFloor();
                 mesh = PropMesh.upload(model);
                 PROP_CACHE.put(placed.model, mesh);
             }
@@ -316,7 +316,7 @@ public class DungeonManager {
             }
             float cx = originX + placed.col * TILE_SIZE + TILE_SIZE / 2f;
             float cz = originZ + placed.row * TILE_SIZE + TILE_SIZE / 2f;
-            // Sobre la cara visible del suelo (PROP_BASE_Y) y con la escala
+            // Sobre la cara visible del suelo (PROP_BASE_Y) y con la scale
             // global del panel aplicada a la de la pieza.
             props.add(new PropInstance(mesh, cx, PROP_BASE_Y, cz, placed.yaw,
                     placed.scale * PROP_SCALE));
@@ -388,7 +388,7 @@ public class DungeonManager {
     /**
      * Construye SOLO la geometría estática de un nivel, sin subirla a la GPU y
      * sin items. Existe para poder verificar geometría, UVs y colisiones en
-     * pruebas sin abrir una ventana de OpenGL; el juego nunca lo llama.
+     * pruebas sin abrir una window de OpenGL; el juego nunca lo llama.
      */
     void buildStaticGeometry(String[] layout) {
         collectStaticGeometry(toCharGrid(layout));
@@ -446,7 +446,7 @@ public class DungeonManager {
     }
 
     /**
-     * Normaliza las aberturas sin orientación: si una ventana o puerta no tiene
+     * Normaliza las aberturas sin orientación: si una window o puerta no tiene
      * ningún vecino muro del que deducir si es horizontal o vertical, se
      * convierte en '■' (muro horizontal macizo). Se hace ANTES de construir la
      * geometría para que el autotiler la emita y no quede una casilla con dos
@@ -583,14 +583,14 @@ public class DungeonManager {
      *       dos paneles se tocan borde con borde, sin hueco ni solape. Es el caso
      *       de los pasillos, las habitosnes abiertas y el interior de las salas.
      *       <p>
-     *   <li><b>Con una celda cerrada al lado</b> (muro, ventana o puerta): esa
+     *   <li><b>Con una celda cerrada al lado</b> (muro, window o puerta): esa
      *       celda se queda SIN panel propio y es el panel de la celda de suelo
      *       el que llega hasta su cara ({@code TILE_SIZE/2 - WALL_THICKNESS/2}
      *       por dentro de la celda cerrada). Asi la cara queda apoyada en el
      *       suelo, sin hueco detras, y sin que el panel se pase de la esquina.
      *       <p>Estoincludes las ventanas y las puertas: antes solo se alargaba
      *       hacia los muros, y una sala cerrada con aberturas se quedaba con un
-     *       margen de 0.9 sin suelo ni techo alrededor de cada ventana.
+     *       margen de 0.9 sin suelo ni techo alrededor de cada window.
      *       <p>
      *   <li><b>Con vacio o borde del mapa al lado</b>: el panel se para en la
      *       frontera de la celda, nunca se alarga. Esto es lo que evita el suelo
@@ -677,7 +677,7 @@ public class DungeonManager {
     /**
      * Railing ('◰'): tramo de piso SIN techo (el piso se pinta por celda, ver
      * {@link #buildFloorsAndCeilings}) con un muro bajo de 2.0 en CADA lado que da
-     * a vacío, muro o ventana. El lado se ABRE (sin barra) cuando la celda
+     * a vacío, muro o window. El lado se ABRE (sin barra) cuando la celda
      * contigua es otra superficie de railing, una puerta, un piso (con o sin
      * techo), un spawn o un artefacto; se CIERRA (con barra) contra el vacío
      * '□', los muros '■◙', las ventanas '▣' y el exterior del mapa.
@@ -751,7 +751,7 @@ public class DungeonManager {
 
     // ¿Barra en el borde horizontal entre la fila b-1 y la b, en la columna c?
     // Cierra si la celda railing de un lado se enfrenta a algo que NO abre el
-    // borde (vacío, muro, ventana o exterior del mapa).
+    // borde (vacío, muro, window o exterior del mapa).
     private boolean horizontalBarAt(char[][] layout, int b, int c) {
         return (isRailingSurface(layout, b - 1, c) && !railingOpens(layout, b, c))
                 || (isRailingSurface(layout, b, c) && !railingOpens(layout, b - 1, c));
@@ -766,7 +766,7 @@ public class DungeonManager {
     // ¿Estirar media celda el extremo de la barra horizontal de la línea b hacia
     // la columna c (justo fuera del tramo)? Solo hacia un PISO (con o sin techo)
     // o una PUERTA, donde el lateral se ABRE: así la barra llega a la habitación
-    // sin dejar huecos. Si en c hay otro '◰', vacío, muro, ventana o exterior,
+    // sin dejar huecos. Si en c hay otro '◰', vacío, muro, window o exterior,
     // el borde queda EXACTO en el límite (sin solapes entre railings vecinos).
     private boolean extendsHorizAt(char[][] layout, int b, int c) {
         if (isRailingSurface(layout, b - 1, c) || isRailingSurface(layout, b, c)) {
@@ -786,7 +786,7 @@ public class DungeonManager {
 
     // ¿La celda merece la estirada de media celda de un extremo de barra? Solo
     // un piso ('◫'/'▒') o una puerta ('◧'): son los lados que se ABREN y donde
-    // la barra debe conectar con la habitación. Contra vacío, muro, ventana,
+    // la barra debe conectar con la habitación. Contra vacío, muro, window,
     // exterior u otra superficie de railing el extremo queda exacto en su límite.
     private boolean isOpeningSurface(char[][] layout, int r, int c) {
         if (r < 0 || r >= layout.length || c < 0 || c >= layout[0].length) {
@@ -800,7 +800,7 @@ public class DungeonManager {
 
     // Una dirección del railing se ABRE (sin barra) si la celda vecina es otra
     // superficie de railing, una puerta, un piso (con/sin techo), un spawn o un
-    // artefacto; el vacío, el muro, la ventana y el exterior del mapa la cierran.
+    // artefacto; el vacío, el muro, la window y el exterior del mapa la cierran.
     private boolean railingOpens(char[][] layout, int r, int c) {
         if (r < 0 || r >= layout.length || c < 0 || c >= layout[0].length) {
             return false;
@@ -910,7 +910,7 @@ public class DungeonManager {
 
     /** Emite un tramo ya resuelto: barra visible baja + colisionador invisible. */
     private void emitRailingBar(RailingBar bar) {
-        // La barra visible es tan baja que el jugador la atraviesa por encima,
+        // La barra visible es tan baja que el player la atraviesa por encima,
         // asi que NO aporta colision; el bloqueo real es el colisionador
         // invisible de abajo, a toda altura y con el mismo contorno en planta.
         wallGeometry.addBox(Railing.barBox(bar.width(), bar.depth(), bar.centerX(), bar.centerZ()),
@@ -990,7 +990,7 @@ public class DungeonManager {
                     // celda no crea Item y no habria nada que recoger. Sumar
                     // la celda igualmente dejaria una llave en el contador que
                     // no existe en el nivel, y el nivel seria imposible de
-                    // terminar (el jugador se queda atrapado buscando una
+                    // terminar (el player se queda atrapado buscando una
                     // llave que no esta). Solo se cuenta lo que existe.
                     if (kind == ItemKind.ARTEFACTO) {
                         // Las llaves son lo unico que hace falta para pasar de
@@ -1078,7 +1078,7 @@ public class DungeonManager {
             addWallBox(panel);
         }
         // Las ventanas NUNCA se traspasan: el hueco visual queda, pero se
-        // registra un colisionador invisible a toda altura para que el jugador
+        // registra un colisionador invisible a toda altura para que el player
         // no pase por el boquete (las puertas sí son transitables agachándose).
         // Este colisionador no se dibuja: solo aporta su AABB.
         if (type.opening() instanceof Window) {
@@ -1092,7 +1092,7 @@ public class DungeonManager {
     /**
      * Reemplaza el nivel completo y reconstruye toda la geometría. Pensado para
      * futuras mecánicas de cambio de escenario: tras llamarlo hay que volver a
-     * registrar las colisiones y reposicionar al jugador en el nuevo spawn.
+     * registrar las colisiones y reposicionar al player en el nuevo spawn.
      */
     public void applyLayout(String[] layout, int wallTexture, int floorTexture, int ceilingTexture) {
         applyLayout(layout, wallTexture, floorTexture, ceilingTexture, ceilingTexture);
@@ -1131,7 +1131,7 @@ public class DungeonManager {
         // vez que se carga un nivel sumarian las llaves del anterior encima de
         // las suyas: el HUD mostraria un total mayor que las llaves que hay en
         // el mapa y, con ellas, el nivel seria imposible de completar (el
-        // jugador se quedaria atrapado sin poder llegar nunca al final). El
+        // player se quedaria atrapado sin poder llegar nunca al final). El
         // collectedKeys tambien se reinicia porque arrastrarlo haria que un
         // nivel apareciera con llaves ya cogidas que no son suyas.
         totalKeys = 0;
@@ -1143,7 +1143,7 @@ public class DungeonManager {
      * Actualiza los items y devuelve el que se acaba de recoger, o
      * {@code null}.
      *
-     * <p>Antes devolvia un {@code boolean} y Main respondia siempre igual,
+     * <p>Antes devolvia un {@code boolean} y GameLoop respondia siempre igual,
      * como si cualquier item fuera un artefacto. Devolviendo el item, quien
      * llama puede distinguir el mapa (que enciende el minimapa) del tiempo (que
      * suma segundos) sin tener que compararse con el numero de celdas.
@@ -1240,7 +1240,7 @@ public class DungeonManager {
 
     /**
      * Llena {@code positions} y {@code colors} con las luces puntuales que
-     * alcanza a ver el jugador, y devuelve cuantas hay.
+     * alcanza a ver el player, y devuelve cuantas hay.
      *
      * <p>Los tres grupos de focos (las placas '◉' del nivel y las llaves) se
      * juntan en una sola lista y se mandan las {@code maxLights} MAS CERCANAS A
@@ -1250,7 +1250,7 @@ public class DungeonManager {
      * la niebla ahi.
      *
      * <p>Los buffers son del llamante y se reutilizan entre frames (ver
-     * {@code lightPosBuffer} en {@code Main}), porque esto corre una vez por
+     * {@code lightPosBuffer} en {@code GameLoop}), porque esto corre una vez por
      * frame y no puede crear un array por luz y frame.
      *
      * @param positions destino, tres floats por luz

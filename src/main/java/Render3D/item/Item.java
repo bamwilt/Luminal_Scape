@@ -1,27 +1,26 @@
 package Render3D.item;
 
+import Render3D.Shader;
+import Render3D.graphics.PropMesh;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
-import Render3D.graphics.PropMesh;
-import UtilsRender.Shader;
-
 /**
- * Base de todo lo que el jugador recoge.
+ * Base de todo lo que el player recoge.
  *
  * <p>Aqui vive lo que <b>todos</b> los items comparten: una malla, un punto del
- * mundo donde flotan, girar sobre si mismos y desaparecer cuando el jugador se
+ * mundo donde flotan, girar sobre si mismos y desaparecer cuando el player se
  * acerca. Lo que hace que una llave sea una llave y no otra cosa va en las
  * subclases ({@link ItemKey}), no aqui.
  *
  * <p>Se separo de {@code DungeonManager} a proposito: cuando se metio la llave,
- * la clase {@code Item} quedo con el nombre del modelo y la escala del modelo
+ * la clase {@code Item} quedo con el nombre del modelo y la scale del modelo
  * grabados dentro. Anyadir un segundo item habia REQUIRED tocar la clase base
- * cada vez, y era facil que un item nuevo saliera con la escala de la llave.
+ * cada vez, y era facil que un item nuevo saliera con la scale de la llave.
  * Con esta jerarquia, cada tipo declara su recurso y su tamano y la base no se
  * entera.
  *
- * <p>La escala, el giro y el flotado van en el constructor y no en metodos
+ * <p>La scale, el giro y el flotado van en el constructor y no en metodos
  * sueltos: asi el comportamiento se declara una vez al crear el item y no se
  * puede desincronizar entre lo que se ve y lo que se recoge.
  */
@@ -63,7 +62,7 @@ public abstract class Item {
      * Gira y flota el item sobre su sitio.
      *
      * <p>El giro no es adorno: un objeto plano desaparece del todo cuando se ve
-     * de canto, y sin el el jugador no ve que hay algo que recoger. Flota por la
+     * de canto, y sin el el player no ve que hay algo que recoger. Flota por la
      * misma razon, para que se distinga de un mueble apoyado en el suelo.
      */
     public void animate(float time) {
@@ -75,7 +74,7 @@ public abstract class Item {
     }
 
     /**
-     * Si el jugador tiene el item encima.
+     * Si el player tiene el item encima.
      *
      * <p>La comparacion va al cuadrado para no sacar raices y el radio lo pasa
      * quien llame, para que la regla de recogida viva en el mapa y no aqui.

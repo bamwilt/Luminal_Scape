@@ -1,7 +1,9 @@
 package Render3D.map;
 
 import java.util.Locale;
+import java.util.Locale;
 
+import java.util.Locale;
 /**
  * Traduce las palabras clave cualitativas de los archivos de nivel a los
  * números exactos con los que trabaja el render.

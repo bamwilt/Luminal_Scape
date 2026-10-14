@@ -5,19 +5,18 @@ import Render2D.UIScale;
 import Render3D.item.ItemKey;
 import Render3D.item.ItemMap;
 import Render3D.item.ItemTime;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
  * Comprobaciones de lo añadido al final: el item de mapa '☑', el giro de
- * cámara con Q/E, la interfaz que se adapta a la ventana, el difícil que cierra
+ * cámara con Q/E, la interfaz que se adapta a la window, el difícil que cierra
  * la niebla y el menú de pausa sin los botones viejos.
  *
  * <p>Va en un {@code main} a propósito, como las otras regresiones del repo: no
  * hay JUnit y estas comprobaciones solo necesitan la clase compilada. Lo que
- * necesita una ventana (recoger un item de verdad, pulsar Q o E, dibujar el
+ * necesita una window (recoger un item de verdad, pulsar Q o E, dibujar el
  * menú) no se puede comprobar aquí: eso lo cubre el smoke con GL. Lo que aquí se
  * lee de los archivos es la parte que no tiene forma de ejecutarse sin abrir el
  * juego, como una tecla pulsada.
@@ -113,8 +112,8 @@ public final class ItemsMapChecks {
         ok(!mm.isVisible(), "reset lo apaga");
         ok(!mm.isRevealedAll(), "y quita lo revelado");
 
-        String main = leer("src/main/java/main/Main.java");
-        ok(main.contains("minimap.reset();"), "Main lo llama");
+        String main = leer("src/main/java/Core/GameLoop.java");
+        ok(main.contains("minimap.reset();"), "GameLoop lo llama");
         int arranque = main.indexOf("private static void startGame()");
         int fin = main.indexOf("private static void winGame()", arranque);
         String cuerpo = main.substring(arranque, fin);
@@ -122,7 +121,8 @@ public final class ItemsMapChecks {
         int reveal = cuerpo.indexOf("minimap.revealAll();");
         ok(reset > 0, "el reset esta dentro de startGame, que es donde se carga cada nivel");
         ok(reveal > reset, "y el revelado de facil va DESPUES, para que no lo pise");
-        ok(cuerpo.indexOf("difficulty == Difficulty.FACIL", reveal) > 0,
+        ok(cuerpo.indexOf("if (levelSession.isFacil())") > 0
+                        && cuerpo.indexOf("if (levelSession.isFacil())") < reveal,
                 "el revelado solo pasa en facil");
     }
 
@@ -133,7 +133,7 @@ public final class ItemsMapChecks {
         // cuenta para el total (ver soloLasLlavesPassen), da igual que lo lleve:
         // lo que no puede pasar es que se quede sin llaves, o con llaves
         // encerradas, porque entonces el contador llega a un numero que el mapa
-        // no tiene y el jugador se queda atrapado sin poder acabarlo.
+        // no tiene y el player se queda atrapado sin poder acabarlo.
         for (String nivel : new String[] { "level_01.txt", "level_02.txt", "level_03.txt", "test_mapa.txt" }) {
             // Las filas tienen que medir lo mismo. Si no, LevelLoader rellena
             // las cortas con espacios y cada espacio es un EMPTY: sin muro, sin
@@ -224,34 +224,35 @@ public final class ItemsMapChecks {
         ok(dm.contains("private boolean hasAnyItem = false;"),
                 "y es un si/no, no un numero");
 
-        String main = leerSilencioso("src/main/java/main/Main.java");
+        String main = leerSilencioso("src/main/java/Core/GameLoop.java");
         ok(main.contains("getCollectedKeys() >= dungeonManager.getTotalKeys()"),
                 "la victoria se decide con las llaves");
         ok(main.contains("getTotalKeys() > 0"), "y solo si el nivel tiene llaves que recoger");
         ok(!main.contains("getCollectedItems") && !main.contains("getTotalItems"),
                 "el HUD, los avisos y la victoria no cuentan con todos los items");
-        ok(main.contains("\"llaves:(\"") || main.contains("llaves:("),
+        String hud = leerSilencioso("src/main/java/Core/HudRenderer.java");
+        ok(hud.contains("\"llaves:(\"") || hud.contains("llaves:("),
                 "y el HUD lo dice con llaves, no con items");
     }
 
     // ---- La interfaz se adapta -------------------------------------------
     private static void escalaDeLaInterfaz() {
-        System.out.println("== escala de la interfaz ==");
+        System.out.println("== scale de la interfaz ==");
         ok(Math.abs(UIScale.of(1280, 720) - 1f) < 1e-4f,
-                "a la resolucion de referencia la escala es 1");
+                "a la resolucion de referencia la scale es 1");
         ok(UIScale.of(1920, 1080) > 1f, "en pantalla grande la interfaz crece");
         ok(UIScale.of(640, 360) < 1f, "en pantalla pequena se encoge");
         ok(UIScale.of(2560, 720) == UIScale.of(1280, 720),
-                "manda el lado que aprieta: una ventana ancha y baja no agranda la IU");
+                "manda el lado que aprieta: una window ancha y baja no agranda la IU");
         ok(UIScale.of(1, 1) >= UIScale.MIN_SCALE, "hay tope inferior");
-        ok(UIScale.of(0, 0) == 1f, "una ventana sin tamaño no rompe nada");
+        ok(UIScale.of(0, 0) == 1f, "una window sin tamaño no rompe nada");
 
         ok(UIScale.virtualW(1920, UIScale.of(1920, 1080)) >= UIScale.REF_W,
                 "el ancho virtual nunca baja del de referencia");
         ok(UIScale.virtualH(1080, UIScale.of(1920, 1080)) >= UIScale.REF_H,
                 "el alto virtual nunca baja del de referencia");
         ok(UIScale.virtualW(640, UIScale.of(640, 360)) > 640,
-                "en ventana pequena el ancho virtual es mayor que el real");
+                "en window pequena el ancho virtual es mayor que el real");
     }
 
     // ---- Q / E ------------------------------------------------------------
@@ -275,27 +276,37 @@ public final class ItemsMapChecks {
     // ---- El menú de pausa se ha limpiado ---------------------------------
     private static void menuDePausaLimpio() throws Exception {
         System.out.println("== menu de pausa ==");
-        String main = leer("src/main/java/main/Main.java");
+        String main = leer("src/main/java/Core/GameLoop.java");
         ok(!main.contains("buttonMinusFPS"), "no queda el boton -FPS");
         ok(!main.contains("buttonPlusFPS"), "no queda el boton +FPS");
         ok(!main.contains("setFPS(30)") && !main.contains("setFPS(60)"), "ni los FPS que ponian");
         ok(!main.contains("buttonMinimapToggle"), "no queda el boton de minimapa ON/OFF");
         ok(!main.contains("buttonMinimapMinus") && !main.contains("buttonMinimapPlus"),
                 "no quedan los botones de tamano del minimapa");
-        ok(main.contains("new Button[3]"), "el menu de pausa se queda con 3 botones");
-        ok(main.contains("Q / E - Girar camara"), "y la pista de controles menciona Q y E");
+
+        // Los botones y la pista viven ahora en MenuScreens; ni alli pueden
+        // quedar los controles viejos.
+        String menus = leer("src/main/java/Core/MenuScreens.java");
+        ok(!menus.contains("buttonMinusFPS") && !menus.contains("buttonPlusFPS")
+                        && !menus.contains("setFPS(30)") && !menus.contains("setFPS(60)"),
+                "ni en MenuScreens quedan los botones de FPS");
+        ok(!menus.contains("buttonMinimapToggle") && !menus.contains("buttonMinimapMinus")
+                        && !menus.contains("buttonMinimapPlus"),
+                "ni los del minimapa");
+        ok(menus.contains("new Button[3]"), "el menu de pausa se queda con 3 botones");
+        ok(menus.contains("Q / E - Girar camara"), "y la pista de controles menciona Q y E");
     }
 
     // ---- Difícil cierra la niebla ----------------------------------------
     private static void nivelDificil() throws Exception {
         System.out.println("== dificil ==");
-        String main = leer("src/main/java/main/Main.java");
+        String main = leer("src/main/java/Core/GameLoop.java");
         int inicio = main.indexOf("private static float viewDistance()");
         ok(inicio > 0, "hay una regla unica de distancia de vista");
         String regla = main.substring(inicio, main.indexOf("\n    }", inicio));
-        ok(regla.contains("DIFICIL"), "esa regla mira la dificultad");
+        ok(regla.contains("isDificil()"), "esa regla mira la dificultad");
         ok(regla.contains("VIEW_DISTANCE_LOW"), "y en dificil manda la vista mas corta");
-        ok(main.contains("float viewDistance = viewDistance();"),
+        ok(main.contains("scene.render(player, elapsedTime, viewDistance())"),
                 "el shader recibe esa regla, no la del nivel");
     }
 
@@ -304,7 +315,7 @@ public final class ItemsMapChecks {
         System.out.println("== recursos ==");
         ok(Files.exists(Paths.get("src/main/resources", ItemMap.MODEL)),
                 "el modelo del mapa esta en recursos (" + ItemMap.MODEL + ")");
-        ok(ItemMap.SCALE > 0f, "el mapa tiene escala");
+        ok(ItemMap.SCALE > 0f, "el mapa tiene scale");
         ok(ItemTime.MODEL.equals(ItemKey.MODEL),
                 "el item de tiempo usa el modelo del artefacto");
     }
@@ -331,7 +342,7 @@ public final class ItemsMapChecks {
      * <p>Sin rellenar: {@link LevelLoader} rellena las filas cortas con
      * espacios y {@code MapConfig} convierte ese espacio en {@code EMPTY}, asi
      * que una fila que se olvida de un glifo no da error: se pierde en
-     * silencio un muro, un suelo o una ventana. Esto solo mira los anchos.
+     * silencio un muro, un suelo o una window. Esto solo mira los anchos.
      */
     private static int[] anchosCrudos(String nivel) throws Exception {
         String texto = leer("src/main/resources/levels/" + nivel);
@@ -364,7 +375,7 @@ public final class ItemsMapChecks {
      * puertas ('◧') si se pasan. El espacio tambien cuenta como pared, y no
      * solo porque suene raro: {@code MapConfig.SymbolType.fromChar(' ')} cae en
      * el {@code default} y devuelve {@code EMPTY}, o sea que una celda de
-     * espacio no tiene ni suelo ni muro ni colision. El jugador se la puede
+     * espacio no tiene ni suelo ni muro ni colision. El player se la puede
      * cruzar, pero es un agujero al vacio, no una ruta del nivel.
      */
     private static boolean[][] alcanzable(String[] filas) {

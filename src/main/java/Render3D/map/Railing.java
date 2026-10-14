@@ -12,7 +12,7 @@ import Render3D.mesh.Box;
  * bordes largos (ver {@link DungeonManager#buildRailings}); se construye UNA
  * barra continua por segmento, extendida hasta los muros/puertas del cuarto.
  *
- * <p>La barra visible NO llega a los pies del jugador, así que para que no se
+ * <p>La barra visible NO llega a los pies del player, así que para que no se
  * pase existe además un COLISIONADOR OCULTO a toda altura (como un muro normal)
  * con el MISMO contorno en planta ({@link #colliderBox}). Sus colisiones van en
  * la lista aparte del gestor de colisiones.

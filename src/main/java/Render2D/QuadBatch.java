@@ -1,12 +1,10 @@
 package Render2D;
 
-import UtilsRender.Shader;
-import org.lwjgl.BufferUtils;
-
+import Render3D.Shader;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.List;
-
+import org.lwjgl.BufferUtils;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.*;

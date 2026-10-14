@@ -1,14 +1,13 @@
 package Render2D;
 
-import UtilsRender.Shader;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL33;
-
+import Render3D.Shader;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL33;
 
 /**
  * Gestor de efectos de visión temporales superpuestos a la pantalla:
@@ -32,7 +31,7 @@ public class VisionManager {
     private final Shader overlayShader;
     private final int vao;
     private final int vbo;
-    private final TextRender messageRenderer;
+    private final TextRenderer messageRenderer;
 
     private int screenWidth = 800;
     private int screenHeight = 600;
@@ -54,7 +53,7 @@ public class VisionManager {
         GL33.glEnableVertexAttribArray(0);
         GL33.glBindVertexArray(0);
 
-        messageRenderer = new TextRender(fontPath, messageFontSize);
+        messageRenderer = new TextRenderer(fontPath, messageFontSize);
     }
 
     public void setProjection(int width, int height) {
@@ -149,11 +148,12 @@ public class VisionManager {
         if (e.text == null || alpha <= 0.001f) {
             return;
         }
-        float w = messageRenderer.getTextWidth(e.text);
-        float h = messageRenderer.getTextHeight(e.text);
-        float x = (screenWidth - w) / 2f;
-        float y = (screenHeight - h) / 2f;
-        messageRenderer.renderer(e.text, x, y, e.r, e.g, e.b, alpha);
+        // El mensaje va en el centro GEOMETRICO de la pantalla. Antes se pasaba el alto
+        // de la linea como si fuera el punto de dibujo y el texto salia alto, por
+        // el mismo descentrado que hacia que los rotulos de los botones no
+        // quadrasen.
+        messageRenderer.drawCentered(e.text, screenWidth / 2f, screenHeight / 2f,
+                e.r, e.g, e.b, alpha);
     }
 
     /** Envolvente 0..1: entra rápido, se mantiene y sale suave. */

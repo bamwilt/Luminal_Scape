@@ -1,12 +1,11 @@
 package Render3D.map;
 
 import Render3D.mesh.Box;
-
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Plantilla de ventana: dos paredes (inferior = alféizar, superior = dintel)
+ * Plantilla de window: dos paredes (inferior = alféizar, superior = dintel)
  * con alturas ajustables. El hueco queda a la altura de la vista.
  *
  * Las alturas se ajustan desde MapConfig ({@link MapConfig#WINDOW_SILL_HEIGHT}

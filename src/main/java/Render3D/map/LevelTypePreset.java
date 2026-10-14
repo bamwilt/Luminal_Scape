@@ -1,8 +1,7 @@
 package Render3D.map;
 
+import Core.ConfigGlobal;
 import org.joml.Vector3f;
-
-import main.GameConfig;
 
 /**
  * Preset de tipo de nivel ({@code level_type}): la identidad visual de un
@@ -37,12 +36,12 @@ public final class LevelTypePreset {
 
     private final String name;
 
-    /** Textura del suelo; {@code null} usa la de {@link GameConfig}. */
+    /** Textura del suelo; {@code null} usa la de {@link ConfigGlobal}. */
     private final String floorTexture;
-    /** Textura del techo; {@code null} usa la de {@link GameConfig}. */
+    /** Textura del techo; {@code null} usa la de {@link ConfigGlobal}. */
     private final String ceilingTexture;
     /**
-     * Textura del muro; {@code null} usa la de {@link GameConfig}.
+     * Textura del muro; {@code null} usa la de {@link ConfigGlobal}.
      *
      * <p>Se dejo global mucho tiempo porque ningun preset necesitaba otra. Con
      * el paquete de los backrooms tiene sentido: el pasillo es hormigon, el
@@ -72,12 +71,12 @@ public final class LevelTypePreset {
     /** Preset neutro: texturas por defecto y cielo del color de fondo actual. */
     public static LevelTypePreset defaultPreset(String name) {
         return new LevelTypePreset(name, null, null, null, SKY_TYPE_GRADIENT, 0.05f,
-                new Vector3f(GameConfig.DEFAULT_SKY_HORIZON_R,
-                        GameConfig.DEFAULT_SKY_HORIZON_G,
-                        GameConfig.DEFAULT_SKY_HORIZON_B),
-                new Vector3f(GameConfig.DEFAULT_SKY_ZENITH_R,
-                        GameConfig.DEFAULT_SKY_ZENITH_G,
-                        GameConfig.DEFAULT_SKY_ZENITH_B));
+                new Vector3f(ConfigGlobal.CIELO_HORIZONTE_R,
+                        ConfigGlobal.CIELO_HORIZONTE_G,
+                        ConfigGlobal.CIELO_HORIZONTE_B),
+                new Vector3f(ConfigGlobal.CIELO_CENIT_R,
+                        ConfigGlobal.CIELO_CENIT_G,
+                        ConfigGlobal.CIELO_CENIT_B));
     }
 
     public String getName() {

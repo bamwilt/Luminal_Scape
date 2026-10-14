@@ -1,12 +1,11 @@
 package Render3D.graphics;
 
+import Render3D.Shader;
 import Render3D.mesh.Mesh;
 import Render3D.mesh.MeshBuilder;
 import Render3D.mesh.UvSpace;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import UtilsRender.Shader;
-
 import static org.lwjgl.opengl.GL11.GL_REPEAT;
 import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
 import static org.lwjgl.opengl.GL11.GL_TEXTURE_WRAP_S;
@@ -200,7 +199,7 @@ public class Wall {
 
     /**
      * Cambia la densidad de textura y <b>reconstruye</b> el mesh, porque el
-     * rango de UV es proporcional a la escala. Solo hay que llamarlo si se
+     * rango de UV es proporcional a la scale. Solo hay que llamarlo si se
      * quiere otra densidad distinta de {@link Render3D.map.MapConfig#UV_SCALE}.
      */
     public void setUvScale(float uvScaleU, float uvScaleV) {

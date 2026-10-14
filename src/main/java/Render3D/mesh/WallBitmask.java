@@ -1,5 +1,6 @@
 package Render3D.mesh;
 
+
 /**
  * Bitmask de vecinos cardinales usada por el autotiling de muros.
  *

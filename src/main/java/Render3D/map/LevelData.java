@@ -1,5 +1,6 @@
 package Render3D.map;
 
+
 /**
  * Nivel ya leído y resuelto: no es solo la matriz de glifos, también lleva la
  * metadata con la que se juega (tiempo, luz ambiente, distancia de niebla) y el
