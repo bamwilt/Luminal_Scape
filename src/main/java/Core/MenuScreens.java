@@ -1,15 +1,20 @@
 package Core;
 
-import Render2D.ImageQuad;
-import Render2D.TextRenderer;
-import Render2D.UIScale;
+import ConfigGlobal.ResourceConfig;
+import ConfigGlobal.UiConfig;
+
+import Render2D.components.ImageQuad;
+import Render2D.components.TextRenderer;
+import Render2D.components.UIScale;
 import Render2D.layout.BorderLayout;
 import Render2D.layout.GridLayout;
-import Render2D.ui.Button;
-import Render2D.ui.ComboBox;
-import Render2D.ui.Label;
-import Render2D.ui.Panel;
-import Render2D.ui.Slider;
+import Render2D.components.Button;
+import Render2D.components.BarChanger;
+import Render2D.components.TextChanger;
+import Render2D.components.ComboBox;
+import Render2D.components.Label;
+import Render2D.components.Panel;
+import Render2D.components.Slider;
 
 /**
  * Todo lo que se dibuja en la pantalla de titulo y en el menu de pausa.
@@ -29,11 +34,11 @@ import Render2D.ui.Slider;
  * <p>La pantalla de Configuracion es un panel partido en dos columnas: a la
  * izquierda los sliders (musica, efectos, brillo, contraste, sensibilidad del
  * raton y velocidad de movimiento) y a la derecha el selector de resolucion,
- * la lista de controles y los dos botones de salida. El boton Volver cierra la
+ * la lista de controles y los dos botones de guardar. El boton Volver cierra la
  * pantalla desde abajo.
  *
  * <p>Los elementos de interfaz (botones, paneles, desplegable) viven en
- * {@code Render2D.ui} y las maquetas en {@code Render2D.layout}.
+ * {@code Render2D.components} y las maquetas en {@code Render2D.layout}.
  */
 final class MenuScreens {
 
@@ -85,6 +90,15 @@ final class MenuScreens {
         /** Vuelve a la pantalla de inicio y resetea al primer nivel. */
         void goToTitle();
 
+        /** Carga el siguiente nivel (tras superar el actual). */
+        void nextLevel();
+
+        /** Reinicia el nivel actual (tras agotarse el tiempo). */
+        void retryLevel();
+
+        /** Da la partida por terminada y muestra el resumen final. */
+        void finishGame();
+
         /** Deja fijos los valores actuales de los seis ajustes. */
         void saveConfig();
 
@@ -113,22 +127,22 @@ final class MenuScreens {
     /** Alto del boton que abre el selector de resolucion. */
     private static final float COMBO_ALTO = 52f;
 
-    /** Alto de cada slider de Configuracion. */
-    private static final float CONFIG_SLIDER_ALTO = 76f;
-    /**
-     * Hueco vertical entre sliders de Configuracion.
-     *
-     * <p>Se bajo de 18 a 14 al anadir los dos sliders de control: con seis
-     * sliders y la lista de controles, 18 dejaba el panel demasiado alto para
-     * caber en 720 unidades de interfaz.
-     */
-    private static final float CONFIG_HUECO = 14f;
-    /** Relleno interior del panel de Configuracion. */
-    private static final float CONFIG_PADDING = 28f;
-    /** Alto de los botones de la parte baja de Configuracion. */
+    /** Alto de cada fila de slider (barra fina + nombre debajo). */
+    private static final float CONFIG_SLIDER_ALTO = 44f;
+    /** Hueco vertical entre filas de sliders de Configuracion. */
+    private static final float CONFIG_HUECO = 16f;
+    /** Relleno interior del panel padre de Configuracion. */
+    private static final float CONFIG_PADDING = 24f;
+    /** Hueco entre secciones de la columna izquierda. */
+    private static final float CONFIG_GAP = 16f;
+    /** Relleno interior de las tarjetas (controles y ajustes). */
+    private static final float CONFIG_CARD_PAD = 14f;
+    /** Relleno interior del panel de barras (columna derecha). */
+    private static final float SLIDERS_PAD = 18f;
+    /** Alto de los botones de Configuracion. */
     private static final float CONFIG_BOTON_ALTO = 48f;
     /** Hueco entre lineas de la lista de controles. */
-    private static final float CONFIG_LINEA_HUECO = 12f;
+    private static final float CONFIG_LINEA_HUECO = 10f;
 
     /** Rotulos de la lista de controles, en el orden en que se apilan. */
     private static final String[] CONTROLES = {
@@ -139,7 +153,6 @@ final class MenuScreens {
             "Ctrl - Agacharse",
             "P - Menu",
             "M - Libera raton",
-            "8 / 9 / 0 - Efectos",
     };
 
     private static final String TITLE_TAGLINE =
@@ -162,16 +175,24 @@ final class MenuScreens {
     // ---- Configuracion ----
     private final Button buttonConfigTitulo;
     private final Button buttonConfigPausa;
+    /** Unica salida: cierra Configuracion y vuelve de donde se abrio. */
     private final Button buttonVolverConfig;
-    /** Vuelve al titulo conservando el nivel elegido. */
-    private final Button buttonSalirMenu;
-    /** Vuelve al titulo reseteando al primer nivel. */
-    private final Button buttonIrInicio;
     /** Deja fijos los valores actuales de los seis ajustes. */
     private final Button buttonGuardar;
     /** Devuelve los seis ajustes a su valor de fabrica. */
     private final Button buttonRestablecer;
+    /** Panel padre de la pantalla de Configuracion (BorderLayout). */
     private final Panel configPanel;
+    /** Rotulo de la pantalla, en la franja superior del panel padre. */
+    private final Label configTitulo;
+    /** Columna derecha: las barras, en una sola columna (todas del mismo ancho). */
+    private final Panel slidersPanel;
+    /** Columna izquierda: controles arriba, ajustes al centro, Volver abajo. */
+    private final Panel leftPanel;
+    /** Subpanel central de la izquierda: Resolucion, Guardar y Restablecer. */
+    private final Panel ajustesPanel;
+    /** Controles: lista de atajos en la franja superior de la izquierda. */
+    private final Panel controlesPanel;
     /** Desplegable de resolucion dentro del panel de Configuracion. */
     private final ComboBox comboResolucionConfig;
     private final Slider sliderMusica;
@@ -180,9 +201,28 @@ final class MenuScreens {
     private final Slider sliderContraste;
     private final Slider sliderSensibilidad;
     private final Slider sliderVelocidad;
-    /** Y del rotulo de la pantalla de Configuracion. */
-    private float configTituloY;
-    /** X e Y del bloque de controles de la columna derecha. */
+
+    // ---- Resultado (victoria / derrota / fin) ----
+    /** Caja del panel de resultado. Sus hijos se colocan a mano en layoutResult. */
+    private final Panel resultPanel;
+    private final Label resultTitulo;
+    private final Label resultLinea;
+    private final Button resultPrimario;
+    private final Button resultSecundario;
+    private final ImageQuad starFull;
+    private final ImageQuad starEmpty;
+    /** Estrellas conseguidas (0..3) que pinta la fila. */
+    private int resultEstrellas = 0;
+    /** Si el panel muestra la fila de estrellas (no en el resumen final). */
+    private boolean resultMostrarEstrellas = true;
+    /** Rectangulo de la fila de estrellas, para dibujarlas. */
+    private float starX, starY, starLado, starGap;
+    /** Instante (nanoTime) en que se mostro el resultado, para animar las estrellas. */
+    private long resultShowNanos = 0L;
+    /** Mejores estrellas por nivel, para pintarlas en el selector del titulo. */
+    private int[] bestStarsNiveles;
+
+    /** X e Y del encabezado de la lista de controles. */
     private float controlesX;
     private float controlesEncabezadoY;
     /** Tope (Y) de la primera linea de la lista de controles. */
@@ -191,19 +231,14 @@ final class MenuScreens {
     // ---- Pantalla de titulo ----
     private final Button buttonJugar;
     private final Button buttonSalir;
-    private final Button buttonLevelPrev;
-    private final Button buttonLevelNext;
-    private final Button buttonDiffPrev;
-    private final Button buttonDiffNext;
 
-    private final Label labelLevel;
-    private final Label labelDiff;
+    // Changers para selectores (reemplazan labelLevel/labelDiff + levelRow/diffRow)
+    private final TextChanger levelChanger;
+    private final TextChanger diffChanger;
 
     // ---- Dashboard del titulo ----
     private final BorderLayout titleBorder;
     private final Panel dashboard;
-    private final Panel levelRow;
-    private final Panel diffRow;
 
     /** Borde superior del bloque de botones del menu de pausa. */
     private float menuBloqueTop;
@@ -220,14 +255,7 @@ final class MenuScreens {
     /** Y donde se dibuja el lema del titulo (arriba de su caja de texto). */
     private float titleTextoY;
 
-    /**
-     * Píxeles de window por unidad de interfaz.
-     *
-     * <p>Toda la IU se dibuja en unidades virtuales ({@link UIScale}) y este
-     * factor es el que las estira a la window real. Se recalcula en cada resize
-     * y también al construir la pantalla, porque el tamaño solo se puede leer de
-     * la window ya construida.
-     */
+    /** Píxeles de window por unidad de interfaz. */
     private float uiScale;
 
     MenuScreens(GameWindow window, TextRenderer text, LevelSession levels, Actions actions) {
@@ -235,17 +263,20 @@ final class MenuScreens {
         this.text = text;
         this.levels = levels;
         this.actions = actions;
-        this.logo = new ImageQuad(ConfigGlobal.TEXTURA_LOGO);
-        this.uiScale = UIScale.of(window.getWidth(), window.getHeight());
+        this.logo = new ImageQuad(ResourceConfig.TEXTURA_LOGO);
+        this.uiScale = Render2D.components.UIScale.of(window.getWidth(), window.getHeight());
 
         // ---- Menu de pausa ----
         buttonCerrarMenu = new Button("Continuar", text);
+        buttonCerrarMenu.setColorInt(34, 139, 34, 255);
         buttonCerrarMenu.setOnClickListener(() -> actions.resumeGame());
 
         buttonRestartTime = new Button("Reiniciar Tiempo", text);
+        buttonRestartTime.setColorInt(255, 140, 0, 255);
         buttonRestartTime.setOnClickListener(() -> actions.restartTime());
 
         buttonVolverMenu = new Button("Volver al menu principal", text);
+        buttonVolverMenu.setColorInt(70, 130, 180, 255);
         buttonVolverMenu.setOnClickListener(() -> actions.returnToTitle());
 
         menuButtons[0] = buttonCerrarMenu;
@@ -253,14 +284,15 @@ final class MenuScreens {
         menuButtons[2] = buttonVolverMenu;
 
         buttonReiniciar = new Button("Reiniciar", text);
+        buttonReiniciar.setColorInt(34, 139, 34, 255);
         buttonReiniciar.setOnClickListener(() -> actions.startGame());
 
         // El panel de pausa tiene su propio color y reparte los botones a lo
         // ancho: todos salen del mismo tamano. Es el mismo modelo que el
         // dashboard del titulo.
         pausaPanel = new Panel()
-                .setBackground(0.06f, 0.09f, 0.16f, 0.90f)
-                .setBorder(0.30f, 0.48f, 0.72f, 0.55f, 2f)
+                .setBackground(0.06f, 0.09f, 0.16f, 1.00f)
+                .setBorder(0.30f, 0.48f, 0.72f, 1.0f, 2f)
                 .setPadding(18f, 22f, 22f, 22f)
                 .setLayout(new GridLayout(1, 0f, MENU_GAP, true, false)
                         .add(buttonCerrarMenu)
@@ -269,26 +301,25 @@ final class MenuScreens {
                         .add(buttonReiniciar));
 
         buttonConfigTitulo = new Button("Configuracion", text);
+        buttonConfigTitulo.setColorInt(70, 130, 180, 255);
         buttonConfigTitulo.setOnClickListener(() -> actions.openConfig());
 
         buttonConfigPausa = new Button("Configuracion", text);
+        buttonConfigPausa.setColorInt(70, 130, 180, 255);
         buttonConfigPausa.setOnClickListener(() -> actions.openConfig());
 
+        // Salida unica: los tres botones de antes (Salir al menu / Pantalla de
+        // inicio / Volver) hacian lo mismo de dos en dos, asi que queda uno.
         buttonVolverConfig = new Button("Volver", text);
+        buttonVolverConfig.setColorInt(139, 34, 34, 255); // ROJO: unica salida
         buttonVolverConfig.setOnClickListener(() -> actions.closeConfig());
 
-        buttonSalirMenu = new Button("Salir al menu", text);
-        buttonSalirMenu.setOnClickListener(() -> actions.returnToTitle());
-
-        // La diferencia con "Salir al menu" es solo el destino: esta vuelve al
-        // primer nivel, la otra deja elegido el que el jugador tenia puesto.
-        buttonIrInicio = new Button("Pantalla de inicio", text);
-        buttonIrInicio.setOnClickListener(() -> actions.goToTitle());
-
-        buttonGuardar = new Button("Guardar configuracion", text);
+        buttonGuardar = new Button("Guardar", text);
+        buttonGuardar.setColorInt(70, 130, 180, 255); // AZUL: accion estandar
         buttonGuardar.setOnClickListener(() -> actions.saveConfig());
 
-        buttonRestablecer = new Button("Restablecer por defecto", text);
+        buttonRestablecer = new Button("Restablecer", text);
+        buttonRestablecer.setColorInt(218, 165, 32, 255); // AMBAR: accion media
         buttonRestablecer.setOnClickListener(() -> actions.resetConfig());
 
         // El panel de Configuracion tiene su propio desplegable de resolucion:
@@ -297,31 +328,29 @@ final class MenuScreens {
 
         // Los sliders se construyen con su valor de partida ANTES de enganchar
         // el onChange, para no disparar acciones del juego al montar la pantalla.
+        // El valor de partida coincide con el de fabrica de AjustesJuego, para
+        // que arrancar y "Restablecer" dejen la misma barra.
         sliderMusica = new Slider("Musica", text)
-                .setFillColor(0.30f, 0.70f, 1f, 0.96f)
+                .setFillColor(0.30f, 0.70f, 1f, 1f)
                 .setPaso(0.05f)
-                .setFactor(1.5f)
                 .setValor(1f);
         sliderMusica.setOnChange(actions::setMusicVolume);
 
         sliderEfectos = new Slider("Efectos", text)
-                .setFillColor(0.35f, 0.90f, 0.45f, 0.96f)
+                .setFillColor(0.35f, 0.90f, 0.45f, 1f)
                 .setPaso(0.05f)
-                .setFactor(1.5f)
                 .setValor(1f);
         sliderEfectos.setOnChange(actions::setSfxVolume);
 
         sliderBrillo = new Slider("Brillo", text)
-                .setFillColor(1f, 0.90f, 0.35f, 0.96f)
+                .setFillColor(1f, 0.90f, 0.35f, 1f)
                 .setPaso(0.05f)
-                .setFactor(1.5f)
                 .setValor(0.5f);
         sliderBrillo.setOnChange(actions::setBrightness);
 
         sliderContraste = new Slider("Contraste", text)
-                .setFillColor(1f, 0.55f, 0.30f, 0.96f)
+                .setFillColor(1f, 0.55f, 0.30f, 1f)
                 .setPaso(0.05f)
-                .setFactor(1.5f)
                 .setValor(0.5f);
         sliderContraste.setOnChange(actions::setContrast);
 
@@ -330,72 +359,126 @@ final class MenuScreens {
         // GameLoop, que es quien la aplica. Los valores por defecto se fijan
         // antes del onChange, como en los otros cuatro.
         sliderSensibilidad = new Slider("Sensibilidad", text)
-                .setFillColor(0.62f, 0.85f, 1f, 0.96f)
+                .setFillColor(0.62f, 0.85f, 1f, 1f)
                 .setPaso(0.05f)
                 .setValor(AjustesJuego.recorridoSensibilidad(AjustesJuego.SENSIBILIDAD_DEFECTO));
         sliderSensibilidad.setOnChange(actions::setMouseSensitivity);
 
         sliderVelocidad = new Slider("Velocidad", text)
-                .setFillColor(0.70f, 1f, 0.80f, 0.96f)
+                .setFillColor(0.70f, 1f, 0.80f, 1f)
                 .setPaso(0.05f)
                 .setValor(AjustesJuego.recorridoVelocidad(AjustesJuego.VELOCIDAD_DEFECTO));
         sliderVelocidad.setOnChange(actions::setMoveSpeed);
 
+        // --- Tarjetas de la pantalla de Configuracion ---
+        // Controles (franja superior de la columna izquierda).
+        controlesPanel = new Panel()
+                .setBackground(0.08f, 0.11f, 0.19f, 0.96f)
+                .setBorder(0.26f, 0.42f, 0.66f, 0.9f, 1.5f)
+                .setCornerRadius(8f)
+                .setPadding(CONFIG_CARD_PAD);
+
+        // Ajustes (centro de la izquierda): Resolucion + Guardar + Restablecer,
+        // en una sola columna para que todos midan lo mismo.
+        ajustesPanel = new Panel()
+                .setBackground(0.08f, 0.11f, 0.19f, 0.96f)
+                .setBorder(0.26f, 0.42f, 0.66f, 0.9f, 1.5f)
+                .setCornerRadius(8f)
+                .setPadding(CONFIG_CARD_PAD)
+                .setLayout(new GridLayout(1, 0f, 12f, true, true)
+                        .add(comboResolucionConfig)
+                        .add(buttonGuardar)
+                        .add(buttonRestablecer));
+
+        // Columna izquierda: controles (arriba), ajustes (centro) y Volver
+        // (abajo). Transparente, con un hueco a la derecha que la separa de las
+        // barras. El hueco entre secciones sale de los dos huecos de CONFIG_GAP.
+        leftPanel = new Panel()
+                .setBackground(0f, 0f, 0f, 0f)
+                .setPadding(0f, CONFIG_GAP, 0f, 0f)
+                .setLayout(new BorderLayout()
+                        .setNorth(controlesPanel, 0f)
+                        .setCenter(ajustesPanel)
+                        .setSouth(buttonVolverConfig, 0f));
+
+        // Columna derecha: un panel para las barras. Una sola columna con fillX
+        // hace que todas midan lo mismo; el nombre va debajo de cada barra.
+        slidersPanel = new Panel()
+                .setBackground(0.08f, 0.11f, 0.19f, 0.96f)
+                .setBorder(0.26f, 0.42f, 0.66f, 0.9f, 1.5f)
+                .setCornerRadius(8f)
+                .setPadding(SLIDERS_PAD, SLIDERS_PAD, SLIDERS_PAD, SLIDERS_PAD)
+                .setLayout(new GridLayout(1, 0f, CONFIG_HUECO, true, true)
+                        .add(sliderMusica).add(sliderEfectos).add(sliderBrillo)
+                        .add(sliderContraste).add(sliderSensibilidad).add(sliderVelocidad));
+
+        // Rotulo de la pantalla.
+        configTitulo = new Label("Configuracion", text).setAlign(Label.Align.CENTER);
+        configTitulo.setColor(1f, 1f, 1f);
+
+        // Panel padre con BorderLayout: el titulo arriba, las barras a la
+        // derecha (EAST) y la columna izquierda (CENTER) con sus tres secciones.
         configPanel = new Panel()
-                .setBackground(0.02f, 0.03f, 0.08f, 0.94f);
+                .setBackground(0.04f, 0.05f, 0.08f, 0.98f)
+                .setBorder(0.35f, 0.50f, 0.75f, 1.0f, 2f)
+                .setCornerRadius(12f)
+                .setPadding(CONFIG_PADDING)
+                .setLayout(new BorderLayout()
+                        .setNorth(configTitulo, 0f)
+                        .setEast(slidersPanel, 0f)
+                        .setCenter(leftPanel));
+
+        // --- Panel de resultado: victoria, derrota y fin de partida ---
+        resultPanel = new Panel()
+                .setBackground(0.05f, 0.06f, 0.10f, 0.98f)
+                .setBorder(0.35f, 0.50f, 0.75f, 1.0f, 2f)
+                .setCornerRadius(12f);
+        resultTitulo = new Label("", text).setAlign(Label.Align.CENTER);
+        resultTitulo.setColor(1f, 1f, 1f);
+        resultLinea = new Label("", text).setAlign(Label.Align.CENTER);
+        resultLinea.setColor(0.85f, 0.88f, 0.96f);
+        resultPrimario = new Button("", text);
+        resultPrimario.setColorInt(34, 139, 34, 255);
+        resultSecundario = new Button("Menu principal", text);
+        resultSecundario.setColorInt(139, 34, 34, 255);
+        starFull = new ImageQuad("images/star_full.png");
+        starEmpty = new ImageQuad("images/star_empty.png");
 
         // ---- Pantalla de titulo ----
         buttonJugar = new Button("Jugar", text);
+        buttonJugar.setColorInt(34, 139, 34, 255);
         buttonJugar.setOnClickListener(() -> actions.startGame());
 
         buttonSalir = new Button("Salir", text);
+        buttonSalir.setColorInt(139, 34, 34, 255);
         buttonSalir.setOnClickListener(() -> System.exit(0));
 
-        // Las flechas son cuadradas: ancho minimo = alto minimo.
-        buttonLevelPrev = new Button("<", text, 20f, 16f, CELDA_FLECHA_LADO);
-        buttonLevelPrev.setOnClickListener(() -> actions.stepLevel(-1));
+        // TextChanger para Nivel: botones < > con label central que ocupa el resto del ancho
+        levelChanger = TextChanger.builder(text, "<", ">", CELDA_FLECHA_LADO)
+                .label("Nivel: --")
+                .labelColor(0f, 1f, 1f)
+                .onLeft(() -> actions.stepLevel(-1))
+                .onRight(() -> actions.stepLevel(1))
+                .build();
 
-        buttonLevelNext = new Button(">", text, 20f, 16f, CELDA_FLECHA_LADO);
-        buttonLevelNext.setOnClickListener(() -> actions.stepLevel(1));
-
-        buttonDiffPrev = new Button("<", text, 20f, 16f, CELDA_FLECHA_LADO);
-        buttonDiffPrev.setOnClickListener(() -> actions.stepDifficulty(-1));
-
-        buttonDiffNext = new Button(">", text, 20f, 16f, CELDA_FLECHA_LADO);
-        buttonDiffNext.setOnClickListener(() -> actions.stepDifficulty(1));
-
-        labelLevel = new Label("Nivel: --", text);
-        labelLevel.setColor(0f, 1f, 1f);
-        labelDiff = new Label("Dificultad: --", text);
-        labelDiff.setColor(1f, 0.86f, 0.35f);
-
-        // Filas de selector: flecha, rotulo, flecha. La fila mide lo que pide su
-        // contenido y se centra en el ancho del dashboard, para que las flechas
-        // queden estrechas y el rotulo no se recorte sin necesidad.
-        levelRow = new Panel()
-                .setBackground(0.05f, 0.07f, 0.14f, 0.9f)
-                .setBorder(0.20f, 0.30f, 0.45f, 0.6f, 1f)
-                .setPadding(6f, 6f, 4f, 4f)
-                .setLayout(new GridLayout(3, HUECO_ENTRE_COLUMNAS, 0f, false, false)
-                        .add(buttonLevelPrev).add(labelLevel).add(buttonLevelNext));
-        diffRow = new Panel()
-                .setBackground(0.07f, 0.05f, 0.12f, 0.9f)
-                .setBorder(0.34f, 0.26f, 0.50f, 0.6f, 1f)
-                .setPadding(6f, 6f, 4f, 4f)
-                .setLayout(new GridLayout(3, HUECO_ENTRE_COLUMNAS, 0f, false, false)
-                        .add(buttonDiffPrev).add(labelDiff).add(buttonDiffNext));
+        // TextChanger para Dificultad: botones < > con label central
+        diffChanger = TextChanger.builder(text, "<", ">", CELDA_FLECHA_LADO)
+                .label("Dificultad: --")
+                .labelColor(1f, 0.86f, 0.35f)
+                .onLeft(() -> actions.stepDifficulty(-1))
+                .onRight(() -> actions.stepDifficulty(1))
+                .build();
 
         // El dashboard: azul muy oscuro y una sola columna que estira los
         // botones a lo ancho (grid full) para que todos midan lo mismo y
-        // ocupen todo el ancho posible. Es casi transparente a proposito: el
-        // titulo se dibuja sobre una capa oscura que ya hay detras.
+        // ocupen TODO el ancho (sin padding horizontal).
         dashboard = new Panel()
-                .setBackground(0.00f, 0.01f, 0.05f, 0.40f)
-                .setPadding(22f, 22f, 26f, 26f)
+                .setBackground(0.00f, 0.01f, 0.05f, 0.85f)
+                .setPadding(1f, 1f, 1f, 1f)  // Mínimo padding (1px) en todos los lados
                 .setLayout(new GridLayout(1, 0f, MENU_GAP, true, false)
                         .add(buttonJugar)
-                        .add(levelRow)
-                        .add(diffRow)
+                        .add(levelChanger)
+                        .add(diffChanger)
                         .add(buttonConfigTitulo)
                         .add(buttonSalir));
 
@@ -412,8 +495,8 @@ final class MenuScreens {
 
     /** Actualiza los rotulos de los selectores y recoloca todo. */
     void refreshLabels() {
-        labelLevel.setText("Nivel: " + levels.name());
-        labelDiff.setText("Dificultad: " + levels.difficultyLabel());
+        levelChanger.setLabelText("Nivel: " + levels.name());
+        diffChanger.setLabelText("Dificultad: " + levels.difficultyLabel());
         layout();
     }
 
@@ -430,9 +513,9 @@ final class MenuScreens {
         float centroW = titleBorder.getCenterAncho();
         titleCentroX = centroX + centroW / 2f;
 
-        titleLogoW = Math.min(w * ConfigGlobal.LOGO_ANCHURA_FRACCION, centroW * 0.92f);
+        titleLogoW = Math.min(w * UiConfig.LOGO_ANCHURA_FRACCION, centroW * 0.92f);
         titleLogoX = centroX + (centroW - titleLogoW) / 2f;
-        titleLogoY = h * ConfigGlobal.LOGO_TOP_FRACCION;
+        titleLogoY = h * UiConfig.LOGO_TOP_FRACCION;
 
         titleTextoY = titleLogoY + logo.heightForWidth(titleLogoW) + HUECO_BLOQUES;
 
@@ -455,88 +538,60 @@ final class MenuScreens {
         }
 
         // ---- Configuracion ------------------------------------------------
-        // El panel se parte en dos columnas: a la izquierda los sliders y a la
-        // derecha la resolucion, los controles y los dos botones de guardar.
-        // Las tres salidas van en la fila del pie, a todo el ancho del panel.
-        // En una sola columna no cabia todo (seis sliders mas la lista de
-        // controles pasaban de las 1000 unidades de alto), y partido asi las dos
-        // columnas quedan casi de la misma altura. El alto del panel sale de la
-        // columna mas alta, de modo que el reparto se recalcula solo si se
-        // añade o se quita un elemento.
-        float cfgW = Math.min(700f, w * 0.72f);
-        float interiorW = cfgW - CONFIG_PADDING * 2f;
-        float colW = (interiorW - CONFIG_HUECO) / 2f;
+        // Panel padre con BorderLayout: titulo arriba, barras a la derecha
+        // (EAST) y columna izquierda (CENTER). Dentro de la izquierda, otro
+        // BorderLayout reparte controles (arriba), ajustes (centro) y Volver
+        // (abajo). Las barras van en un GridLayout de una sola columna con
+        // fillX: todas miden lo mismo.
+        float cfgW = Math.min(860f, w * 0.84f);
         float tituloAlto = text.measureText("Configuracion").alto();
-        float altoColumnas = Math.max(altoColumnaSliders(), altoColumnaDerecha());
-        float altoPanel = CONFIG_PADDING * 2f + tituloAlto + CONFIG_HUECO
-                + altoColumnas + CONFIG_HUECO + CONFIG_BOTON_ALTO;
+        float controlesH = altoControles();
+        float ajustesH = 2f * CONFIG_CARD_PAD + 3f * CONFIG_BOTON_ALTO + 2f * 12f;
+        float volverH = CONFIG_BOTON_ALTO;
+        float slidersH = 2f * SLIDERS_PAD + 6f * CONFIG_SLIDER_ALTO + 5f * CONFIG_HUECO;
+        float columnaIzqH = controlesH + ajustesH + volverH + 2f * CONFIG_GAP;
+        float contenidoH = Math.max(slidersH, columnaIzqH);
+        float innerH = tituloAlto + CONFIG_GAP + contenidoH;
+        float altoPanel = innerH + CONFIG_PADDING * 2f;
         float cfgX = (w - cfgW) / 2f;
         float cfgY = Math.max(HUECO_BLOQUES, (h - altoPanel) / 2f);
 
+        // Fracciones del BorderLayout padre y del de la columna izquierda. El
+        // centro de la izquierda se queda con el resto (ajustes + los huecos).
+        configPanel.setLayout(new BorderLayout()
+                .setNorth(configTitulo, tituloAlto / innerH)
+                .setEast(slidersPanel, 0.40f)
+                .setCenter(leftPanel));
+        leftPanel.setLayout(new BorderLayout()
+                .setNorth(controlesPanel, controlesH / contenidoH)
+                .setCenter(ajustesPanel)
+                .setSouth(buttonVolverConfig, volverH / contenidoH));
+
         configPanel.setBounds(cfgX, cfgY, cfgW, altoPanel);
-        configTituloY = cfgY + CONFIG_PADDING + tituloAlto;
 
-        float colIzqX = cfgX + CONFIG_PADDING;
-        float colDerX = colIzqX + colW + CONFIG_HUECO;
-        float colY = configTituloY + CONFIG_HUECO;
+        // Tras repartir, la tarjeta de controles ya tiene su rectangulo: de ahi
+        // salen las posiciones del texto de la lista de atajos.
+        controlesX = controlesPanel.getX() + CONFIG_CARD_PAD;
+        controlesEncabezadoY = controlesPanel.getY() + CONFIG_CARD_PAD;
+        controlesTop = controlesEncabezadoY
+                + text.measureText("Controles").alto() + CONFIG_LINEA_HUECO;
 
-        // Columna izquierda: los sliders apilados, todos del mismo alto.
-        Slider[] sliders = configSliders();
-        for (int i = 0; i < sliders.length; i++) {
-            sliders[i].setBounds(colIzqX, colY + i * (CONFIG_SLIDER_ALTO + CONFIG_HUECO),
-                    colW, CONFIG_SLIDER_ALTO);
-            sliders[i].actualizarPosicion(w, h);
+        // Posiciones de ventana para el raton de los sliders.
+        for (Slider s : configSliders()) {
+            s.actualizarPosicion(w, h);
         }
 
-        // Columna derecha: resolucion arriba, debajo la lista de controles y,
-        // pegados al pie de la columna, guardar y restablecer.
-        comboResolucionConfig.setBounds(colDerX, colY, colW, COMBO_ALTO);
-
-        controlesX = colDerX;
-        controlesEncabezadoY = colY + COMBO_ALTO + CONFIG_HUECO;
-        controlesTop = controlesEncabezadoY
-                + text.measureText("Controles").alto() + CONFIG_HUECO;
-
-        float pieY = colY + altoColumnas;
-        buttonGuardar.setBounds(colDerX, pieY - 2f * CONFIG_BOTON_ALTO - CONFIG_HUECO,
-                colW, CONFIG_BOTON_ALTO);
-        buttonRestablecer.setBounds(colDerX, pieY - CONFIG_BOTON_ALTO, colW, CONFIG_BOTON_ALTO);
-
-        // La fila del pie reune las tres salidas: cabe entera en el ancho que
-        // sobraba (137 + 209 + 252 + dos huecos = 627 de 644), asi que se
-        // reparten ese ancho a partes iguales sin encogerse.
-        float pieAncho = (interiorW - 2f * CONFIG_HUECO) / 3f;
-        buttonSalirMenu.setBounds(colIzqX, pieY + CONFIG_HUECO, pieAncho, CONFIG_BOTON_ALTO);
-        buttonIrInicio.setBounds(colIzqX + pieAncho + CONFIG_HUECO, pieY + CONFIG_HUECO,
-                pieAncho, CONFIG_BOTON_ALTO);
-        buttonVolverConfig.setBounds(colIzqX + 2f * (pieAncho + CONFIG_HUECO), pieY + CONFIG_HUECO,
-                pieAncho, CONFIG_BOTON_ALTO);
-        buttonSalirMenu.actualizarPosicion(w, h);
-        buttonIrInicio.actualizarPosicion(w, h);
-        buttonVolverConfig.actualizarPosicion(w, h);
+        layoutResult(w, h);
     }
 
-    /** Alto de la columna de sliders de Configuracion. */
-    private float altoColumnaSliders() {
-        int n = configSliders().length;
-        return n * CONFIG_SLIDER_ALTO + (n - 1) * CONFIG_HUECO;
-    }
-
-    /**
-     * Alto de la columna derecha de Configuracion: resolucion, encabezado y
-     * lineas de controles, y los dos botones del pie (guardar y restablecer).
-     *
-     * <p>Son los de guardar, no los de salida: esos han bajado a la fila del
-     * pie, que sobraba en ancho y asi la columna se queda como estaba (470
-     * frente a los 526 de los sliders) y el panel no crece ni un pixel.
-     */
-    private float altoColumnaDerecha() {
-        float alto = COMBO_ALTO + CONFIG_HUECO;
-        alto += text.measureText("Controles").alto() + CONFIG_HUECO;
+    /** Alto de la tarjeta de controles (encabezado + lista + relleno). */
+    private float altoControles() {
+        float alto = 2f * CONFIG_CARD_PAD;
+        alto += text.measureText("Controles").alto() + CONFIG_LINEA_HUECO;
         for (String linea : CONTROLES) {
             alto += text.measureText(linea).alto() + CONFIG_LINEA_HUECO;
         }
-        return alto + CONFIG_HUECO + CONFIG_BOTON_ALTO + CONFIG_HUECO + CONFIG_BOTON_ALTO;
+        return alto;
     }
 
     /**
@@ -565,17 +620,17 @@ final class MenuScreens {
         todos[3] = buttonReiniciar;
         todos[4] = buttonJugar;
         todos[5] = buttonSalir;
-        todos[6] = buttonLevelPrev;
-        todos[7] = buttonLevelNext;
-        todos[8] = buttonDiffPrev;
-        todos[9] = buttonDiffNext;
+        todos[6] = levelChanger.getLeftButton();
+        todos[7] = levelChanger.getRightButton();
+        todos[8] = diffChanger.getLeftButton();
+        todos[9] = diffChanger.getRightButton();
         todos[10] = buttonConfigTitulo;
         todos[11] = buttonConfigPausa;
         todos[12] = buttonVolverConfig;
-        todos[13] = buttonSalirMenu;
-        todos[14] = buttonIrInicio;
-        todos[15] = buttonGuardar;
-        todos[16] = buttonRestablecer;
+        todos[13] = buttonGuardar;
+        todos[14] = buttonRestablecer;
+        todos[15] = resultPrimario;
+        todos[16] = resultSecundario;
         return todos;
     }
 
@@ -587,39 +642,39 @@ final class MenuScreens {
 
     /** Valor actual del slider de musica. */
     float getSliderMusica() {
-        return sliderMusica.getValor();
+        return sliderMusica.getValue();
     }
 
     /** Valor actual del slider de efectos. */
     float getSliderEfectos() {
-        return sliderEfectos.getValor();
+        return sliderEfectos.getValue();
     }
 
     /** Valor actual del slider de brillo. */
     float getSliderBrillo() {
-        return sliderBrillo.getValor();
+        return sliderBrillo.getValue();
     }
 
     /** Valor actual del slider de contraste. */
     float getSliderContraste() {
-        return sliderContraste.getValor();
+        return sliderContraste.getValue();
     }
 
     /** Valor actual del slider de sensibilidad del raton. */
     float getSliderSensibilidad() {
-        return sliderSensibilidad.getValor();
+        return sliderSensibilidad.getValue();
     }
 
     /** Valor actual del slider de velocidad de movimiento. */
     float getSliderVelocidad() {
-        return sliderVelocidad.getValor();
+        return sliderVelocidad.getValue();
     }
 
     /**
      * Recalcula la scale de la interfaz y la reparte a los botones.
      */
     void updateUiScale(int w, int h) {
-        uiScale = UIScale.of(w, h);
+        uiScale = Render2D.components.UIScale.of(w, h);
         for (Button b : todosLosBotones()) {
             b.setScale(uiScale);
         }
@@ -652,10 +707,8 @@ final class MenuScreens {
     void handleTitleMouse(long handle) {
         buttonJugar.handleMouseEvent(handle);
         buttonSalir.handleMouseEvent(handle);
-        buttonLevelPrev.handleMouseEvent(handle);
-        buttonLevelNext.handleMouseEvent(handle);
-        buttonDiffPrev.handleMouseEvent(handle);
-        buttonDiffNext.handleMouseEvent(handle);
+        levelChanger.handleMouseEvent(handle);
+        diffChanger.handleMouseEvent(handle);
         buttonConfigTitulo.handleMouseEvent(handle);
     }
 
@@ -689,6 +742,27 @@ final class MenuScreens {
                 w, h, 1f);
 
         centeredTextAt(titleCentroX, TITLE_TAGLINE, titleTextoY, 1f, 1f, 1f);
+
+        dibujarEstrellasNivelSeleccionado(w, h);
+    }
+
+    /**
+     * Pinta las 3 estrellas del nivel seleccionado bajo el lema del titulo, para
+     * ver de un vistazo la mejor puntuacion de cada nivel.
+     */
+    private void dibujarEstrellasNivelSeleccionado(int w, int h) {
+        float lado = 34f;
+        float gap = 10f;
+        float fila = LevelRating.MAX_ESTRELLAS * lado + (LevelRating.MAX_ESTRELLAS - 1) * gap;
+        float x0 = titleCentroX - fila / 2f;
+        float y = titleTextoY + text.measureText(TITLE_TAGLINE).alto() + HUECO_BLOQUES * 0.7f;
+        int nivel = levels.index();
+        int estrellas = (bestStarsNiveles != null && nivel >= 0 && nivel < bestStarsNiveles.length)
+                ? bestStarsNiveles[nivel] : 0;
+        for (int i = 0; i < LevelRating.MAX_ESTRELLAS; i++) {
+            float x = x0 + i * (lado + gap);
+            (i < estrellas ? starFull : starEmpty).draw(x, y, lado, lado, w, h, 1f);
+        }
     }
 
     /**
@@ -712,8 +786,6 @@ final class MenuScreens {
         }
         comboResolucionConfig.handleMouseEvent(handle);
         buttonVolverConfig.handleMouseEvent(handle);
-        buttonSalirMenu.handleMouseEvent(handle);
-        buttonIrInicio.handleMouseEvent(handle);
         buttonGuardar.handleMouseEvent(handle);
         buttonRestablecer.handleMouseEvent(handle);
     }
@@ -739,17 +811,12 @@ final class MenuScreens {
     void renderConfig(int w, int h) {
         long handle = window.getWindowHandle();
 
+        // El panel padre pinta su caja, su titulo y las dos columnas; dentro,
+        // cada tarjeta pinta su fondo y sus hijos (sliders, resolucion, botones).
         configPanel.dibujar(w, h, handle);
 
-        centeredText(w, "Configuracion", configTituloY, 1f, 1f, 1f);
-
-        for (Slider s : configSliders()) {
-            s.dibujar(w, h, handle);
-        }
-
-        // Lista de controles: el encabezado va en el mismo estilo que el titulo
-        // de la pantalla y las lineas se apilan midiendo la tinta de cada una,
-        // igual que hace el Slider con su rotulo.
+        // Lista de controles dentro de su tarjeta (texto dibujado a mano; la
+        // tarjeta ya la ha pintado el panel padre).
         text.drawTope("Controles", controlesX, controlesEncabezadoY, 1f, 1f, 1f);
         float y = controlesTop;
         for (String linea : CONTROLES) {
@@ -757,23 +824,162 @@ final class MenuScreens {
             y += text.measureText(linea).alto() + CONFIG_LINEA_HUECO;
         }
 
-        buttonVolverConfig.dibujar(w, h, handle);
-        buttonGuardar.dibujar(w, h, handle);
-        buttonRestablecer.dibujar(w, h, handle);
-        buttonSalirMenu.dibujar(w, h, handle);
-        buttonIrInicio.dibujar(w, h, handle);
+        // Pista de teclado abajo del todo.
+        text.drawCenteredH("P - Volver", w, h - MARGEN_PISTAS, 0.8f, 0.8f, 0.8f);
 
-        text.drawCenteredH("P - Volver", w,
-                h - MARGEN_PISTAS, 0.8f, 0.8f, 0.8f);
+        // Las opciones del desplegable, si esta abierto, se pintan en la capa
+        // POPUPS (renderConfigPopups), por encima de todo.
+    }
 
-        // El desplegable se dibuja al final, igual que en el menu de pausa: sus
-        // opciones abiertas tienen que tapar lo que haya debajo. El principal va
-        // aqui, en su sitio dentro de la pantalla; las opciones se pintan en una
-        // llamada aparte al cierre del metodo, despues de todo lo demas.
-        comboResolucionConfig.dibujar(w, h, handle);
+    /** Copia las mejores estrellas por nivel para pintarlas en el titulo. */
+    void setBestStars(int[] stars) {
+        bestStarsNiveles = stars == null ? null : stars.clone();
+    }
 
-        // Ultimo trazo del frame: el desplegable, si esta abierto, por encima
-        // del panel, de los sliders y de los botones.
+    /** Muestra la pantalla de nivel superado, con estrellas, tiempo y record. */
+    void mostrarVictoria(int estrellas, float segundos, boolean ultimoNivel, boolean record) {
+        resultShowNanos = System.nanoTime();
+        resultTitulo.setText(ultimoNivel ? "Ultimo nivel superado" : "Nivel superado");
+        resultEstrellas = estrellas;
+        resultMostrarEstrellas = true;
+        resultLinea.setText("Tiempo: " + formatearTiempo(segundos)
+                + (record ? "   -   Nuevo record" : ""));
+        resultLinea.setColor(record ? 1f : 0.85f, record ? 0.86f : 0.88f, record ? 0.35f : 0.96f);
+        resultPrimario.setText(ultimoNivel ? "Finalizar" : "Siguiente nivel");
+        resultPrimario.setOnClickListener(ultimoNivel
+                ? () -> actions.finishGame()
+                : () -> actions.nextLevel());
+        resultSecundario.setText("Menu principal");
+        resultSecundario.setVisible(true);
+        resultSecundario.setOnClickListener(() -> actions.returnToTitle());
+        layoutResult(virtualW(), virtualH());
+    }
+
+    /** Muestra la pantalla de tiempo agotado. */
+    void mostrarDerrota() {
+        resultShowNanos = System.nanoTime();
+        resultTitulo.setText("Se acabo el tiempo");
+        resultEstrellas = 0;
+        resultMostrarEstrellas = true;
+        resultLinea.setText(levels.name());
+        resultPrimario.setText("Reintentar");
+        resultPrimario.setOnClickListener(() -> actions.retryLevel());
+        resultSecundario.setText("Menu principal");
+        resultSecundario.setVisible(true);
+        resultSecundario.setOnClickListener(() -> actions.returnToTitle());
+        layoutResult(virtualW(), virtualH());
+    }
+
+    /** Muestra el resumen final con el total de estrellas. */
+    void mostrarFinal(int total, int max, float segundosTotal) {
+        resultShowNanos = System.nanoTime();
+        resultTitulo.setText("Fin del juego");
+        resultMostrarEstrellas = false;
+        resultLinea.setColor(0.85f, 0.88f, 0.96f);
+        resultLinea.setText("Estrellas: " + total + "/" + max
+                + "   -   Tiempo total: " + formatearTiempo(segundosTotal));
+        resultPrimario.setText("Menu principal");
+        resultPrimario.setOnClickListener(() -> actions.goToTitle());
+        resultSecundario.setVisible(false);
+        layoutResult(virtualW(), virtualH());
+    }
+
+    /** Dibuja el panel de resultado (victoria, derrota o fin). */
+    void renderVictory(int w, int h) {
+        long handle = window.getWindowHandle();
+        float t = (System.nanoTime() - resultShowNanos) / 1_000_000_000f;
+        resultPanel.dibujar(w, h, handle);
+        resultTitulo.dibujar(w, h, handle);
+        if (resultMostrarEstrellas) {
+            // Marco vacio de cada hueco...
+            for (int i = 0; i < LevelRating.MAX_ESTRELLAS; i++) {
+                starEmpty.draw(starX + i * (starLado + starGap), starY, starLado, starLado, w, h, 1f);
+            }
+            // ...y las ganadas aparecen una a una con un pequeno rebote.
+            for (int i = 0; i < resultEstrellas; i++) {
+                float u = clamp01((t - (0.15f + i * 0.18f)) / 0.30f);
+                float lado = starLado * (0.55f + 0.45f * easeOutBack(u));
+                float cx = starX + i * (starLado + starGap) + starLado / 2f;
+                float cy = starY + starLado / 2f;
+                starFull.draw(cx - lado / 2f, cy - lado / 2f, lado, lado, w, h, u);
+            }
+        }
+        resultLinea.dibujar(w, h, handle);
+        resultPrimario.dibujar(w, h, handle);
+        resultSecundario.dibujar(w, h, handle);
+    }
+
+    private static float clamp01(float v) {
+        return v < 0f ? 0f : (v > 1f ? 1f : v);
+    }
+
+    /** Easing con rebote final, para que la estrella "encaje" con gracia. */
+    private static float easeOutBack(float x) {
+        float c1 = 1.70158f;
+        float c3 = c1 + 1f;
+        float x1 = x - 1f;
+        return 1f + c3 * x1 * x1 * x1 + c1 * x1 * x1;
+    }
+
+    /** Pasa el raton a los botones del panel de resultado. */
+    void handleVictoryMouse(long handle) {
+        resultPrimario.handleMouseEvent(handle);
+        resultSecundario.handleMouseEvent(handle);
+    }
+
+    /** Reparte el panel de resultado y sus hijos, centrado en la pantalla. */
+    private void layoutResult(int w, int h) {
+        float pad = 28f;
+        float gap = 18f;
+        float tituloH = text.measureText("Nivel superado").alto();
+        float lineaH = text.measureText("Tiempo: 00:00").alto();
+        float btnH = Button.CELDA_BOTON_MINIMA_H;
+        starLado = 72f;
+        starGap = 16f;
+
+        float panelW = Math.min(560f, w * 0.72f);
+        float contenidoH = tituloH + gap + lineaH + gap + btnH;
+        if (resultMostrarEstrellas) {
+            contenidoH += starLado + gap;
+        }
+        float panelH = contenidoH + pad * 2f;
+        float px = (w - panelW) / 2f;
+        float py = (h - panelH) / 2f;
+        resultPanel.setBounds(px, py, panelW, panelH);
+
+        float top = py + pad;
+        resultTitulo.setBounds(px + pad, top, panelW - 2f * pad, tituloH);
+        top += tituloH + gap;
+        if (resultMostrarEstrellas) {
+            float fila = 3f * starLado + 2f * starGap;
+            starX = px + (panelW - fila) / 2f;
+            starY = top;
+            top += starLado + gap;
+        }
+        resultLinea.setBounds(px + pad, top, panelW - 2f * pad, lineaH);
+        top += lineaH + gap;
+
+        float btnGap = 16f;
+        if (resultSecundario.isVisible()) {
+            float btnW = (panelW - 2f * pad - btnGap) / 2f;
+            resultPrimario.setBounds(px + pad, top, btnW, btnH);
+            resultSecundario.setBounds(px + pad + btnW + btnGap, top, btnW, btnH);
+        } else {
+            resultPrimario.setBounds(px + pad, top, panelW - 2f * pad, btnH);
+        }
+    }
+
+    /** Formatea segundos como mm:ss. */
+    private static String formatearTiempo(float segundos) {
+        int s = Math.max(0, Math.round(segundos));
+        return String.format("%02d:%02d", s / 60, s % 60);
+    }
+
+    /**
+     * Dibuja los popups de la pantalla de Configuracion (ComboBox opciones abiertas).
+     * Se llama desde la capa POPUPS para que queden por encima de todo.
+     */
+    void renderConfigPopups(int w, int h, long handle) {
         if (comboResolucionConfig.estaAbierto()) {
             comboResolucionConfig.dibujarOpciones(w, h, handle);
         }
@@ -781,5 +987,7 @@ final class MenuScreens {
 
     void cleanup() {
         logo.cleanup();
+        starFull.cleanup();
+        starEmpty.cleanup();
     }
 }

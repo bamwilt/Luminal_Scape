@@ -1126,6 +1126,12 @@ public class DungeonManager {
         // Los items no liberan su malla: comparten la cache de modelos con la
         // decoracion, que se libera una vez al cerrar el juego.
         items.clear();
+        // La decoracion tambien es POR NIVEL. Sin este clear, las piezas del
+        // nivel anterior (plantas, mesas, alfombras) se quedaban en la lista y
+        // se seguian dibujando en el nivel nuevo aunque este no tuviera
+        // ninguna: por eso aparecian "solas" en mapas sin '#'.
+        props.clear();
+        totalProps = 0;
         // Los contadores de llaves son POR NIVEL y se ponen a cero aqui, que es
         // donde se vacia la lista de items. Si se dejaran como estaban, cada
         // vez que se carga un nivel sumarian las llaves del anterior encima de
@@ -1488,6 +1494,15 @@ public class DungeonManager {
     /** Yaw inicial de la cámara según la flecha de spawn (0 = +X, 90 = +Z). */
     public float getSpawnYaw() {
         return spawnYaw;
+    }
+
+    /** Centros de todos los items del nivel (para la camara aerea del titulo). */
+    public List<Vector3f> getItemCenters() {
+        List<Vector3f> centers = new ArrayList<>(items.size());
+        for (Item item : items) {
+            centers.add(item.getCenter());
+        }
+        return centers;
     }
 
 }

@@ -5,17 +5,7 @@ import java.util.List;
 
 import Render3D.map.MapConfig.SymbolType;
 
-/**
- * Decide que decoracion va en cada celda de suelo.
- *
- * <p>La colocacion es <b>manual</b>: solo se decora donde el autor del nivel
- * pone el simbolo {@code #} ({@link SymbolType#DECORATION}). El resto de
- * celdas (incluso suelo transitable) no reciben decoracion automatica.
- *
- * <p>La pieza y su giro se eligen de forma determinista mediante un hash de
- * las coordenadas de la celda, asi que la misma celda pone siempre la misma
- * pieza y con el mismo giro, partida tras partida y maquina tras maquina.
- */
+
 public final class PropLayout {
 
     /** Una pieza colocada: recurso, celda, giro y escala. */

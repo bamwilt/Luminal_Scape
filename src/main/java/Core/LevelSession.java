@@ -77,6 +77,16 @@ final class LevelSession {
         }
     }
 
+    /** Indice del nivel seleccionado, 0-based. */
+    int index() {
+        return index;
+    }
+
+    /** Numero de niveles de la partida. */
+    int count() {
+        return files.length;
+    }
+
     /** El nivel seleccionado es el ultimo de la lista? */
     boolean isLastLevel() {
         return index >= files.length - 1;

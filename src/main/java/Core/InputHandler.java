@@ -36,7 +36,10 @@ final class InputHandler {
 
         void toggleTestLevel();
 
-        /** Atajos 8/9/0 de los efectos de vision (solo en partida). */
+        /** Alterna el modo desarrollador (tecla T). */
+        void toggleDeveloperMode();
+
+        /** Atajos 8/9/0 de los efectos de vision (solo en partida, modo desarrollador). */
         void handleNumKeys(long handle);
 
         /** Cierra la pantalla de Configuracion y vuelve de donde se vino. */
@@ -53,7 +56,7 @@ final class InputHandler {
     private boolean enterKeyPressed = false;
     private boolean leftKeyPressed = false;
     private boolean rightKeyPressed = false;
-    private boolean testKeyPressed = false;
+    private boolean uKeyPressed = false;
 
     InputHandler(GameWindow window, MenuScreens menus, Actions actions) {
         this.window = window;
@@ -86,18 +89,35 @@ final class InputHandler {
         }
         escKeyPressed = pPressed;
 
+        // U alterna test level + developer mode (funciona en CUALQUIER estado)
+        boolean uPressed = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_U) == GLFW.GLFW_PRESS;
+        if (uPressed && !uKeyPressed) {
+            actions.toggleTestLevel();
+            actions.toggleDeveloperMode();
+        }
+        uKeyPressed = uPressed;
+
+        // handleNumKeys ahora gestiona modo desarrollador (1-4) y efectos (8,9,0)
+        // se llama en todos los estados donde tiene sentido; la función verifica developerMode.
         switch (state) {
             case PLAYING:
                 actions.handleNumKeys(handle);
                 break;
             case PAUSED:
+                actions.handleNumKeys(handle);
                 menus.handlePausedMouse(handle);
                 break;
             case TITLE:
+                actions.handleNumKeys(handle);
                 handleTitle(handle);
                 break;
             case CONFIG:
+                actions.handleNumKeys(handle);
                 menus.handleConfigMouse(handle);
+                break;
+            case VICTORY:
+                actions.handleNumKeys(handle);
+                menus.handleVictoryMouse(handle);
                 break;
             default:
                 break;
@@ -125,12 +145,6 @@ final class InputHandler {
         }
         rightKeyPressed = rightPressed;
 
-        // T saca o esconde el nivel de pruebas. No hay pista en pantalla
-        // que lo diga: es una tecla secreta a proposito.
-        boolean testPressed = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_T) == GLFW.GLFW_PRESS;
-        if (testPressed && !testKeyPressed) {
-            actions.toggleTestLevel();
-        }
-        testKeyPressed = testPressed;
+
     }
 }

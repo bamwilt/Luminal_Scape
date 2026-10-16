@@ -1,4 +1,4 @@
-import Core.ConfigGlobal;
+import ConfigGlobal.DecorConfig;
 import Render3D.graphics.GlbModel;
 import Render3D.map.Atmosphere;
 import Render3D.map.LevelData;
@@ -109,7 +109,7 @@ public final class DecorYTechoChecks {
 
         // El reparto por grupos: acumulado, creciente y con el último por encima
         // de 1 para que el último grupo cubra siempre el resto del rango.
-        float[] ends = ConfigGlobal.PROP_DECOR_GROUP_ENDS;
+        float[] ends = DecorConfig.PROP_DECOR_GROUP_ENDS;
         ok(ends.length >= 1, "hay al menos un grupo de decoracion");
         ok(ends[ends.length - 1] > 1f,
                 "el ultimo umbral de grupo pasa de 1 para cubrir todo el rango");

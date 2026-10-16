@@ -1,6 +1,10 @@
 package Core;
 
+import ConfigGlobal.CameraConfig;
+import ConfigGlobal.LightingConfig;
+
 import Player.Player;
+import Render2D.camera.Camera;
 import Render3D.Shader;
 import Render3D.graphics.SkyRenderer;
 import Render3D.map.Atmosphere;
@@ -35,7 +39,7 @@ final class SceneRenderer {
 
     /** Posición de la luz direccional, fija para todo el nivel. */
     private final Vector3f lightPos =
-            new Vector3f(ConfigGlobal.LUZ_X, ConfigGlobal.LUZ_Y, ConfigGlobal.LUZ_Z);
+            new Vector3f(LightingConfig.LUZ_X, LightingConfig.LUZ_Y, LightingConfig.LUZ_Z);
 
     /**
      * Buffers donde caen las luces puntuales de cada frame, reutilizados para
@@ -65,20 +69,29 @@ final class SceneRenderer {
      * @param viewDistance distancia de vista ya resuelta con la dificultad
      */
     void render(Player player, float elapsedTime, float viewDistance) {
+        renderWithCamera(player.getCamara(), elapsedTime, viewDistance);
+    }
+
+    /**
+     * Dibuja un frame del escenario usando una camara personalizada (por
+     * ejemplo, la camara aerea animada de la pantalla de titulo), en lugar de
+     * la camara del jugador.
+     */
+    void renderWithCamera(Camera cam, float elapsedTime, float viewDistance) {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             Matrix4f projection = new Matrix4f().perspective(
-                    (float) Math.toRadians(ConfigGlobal.FOV_GRADOS),
+                    (float) Math.toRadians(CameraConfig.FOV_GRADOS),
                     (float) window.getWidth() / window.getHeight(),
-                    ConfigGlobal.PLANO_CERCANO,
-                    ConfigGlobal.PLANO_LEJANO);
+                    CameraConfig.PLANO_CERCANO,
+                    CameraConfig.PLANO_LEJANO);
 
-            Matrix4f view = player.getCamara().getViewMatrix();
+            Matrix4f view = cam.getViewMatrix();
             LevelTypePreset preset = levelSession.data().getPreset();
-            Vector3f cameraPos = player.getCamara().getPosition();
+            Vector3f cameraPos = cam.getPosition();
 
             // 1. Cielo: se dibuja primero, sin escribir profundidad, y deja el
             //    estado de profundidad listo para la geometria.
-            cieloRender.render(projection, view, cameraPos, elapsedTime, ConfigGlobal.PLANO_LEJANO, preset);
+            cieloRender.render(projection, view, cameraPos, elapsedTime, CameraConfig.PLANO_LEJANO, preset);
 
             // 2. Escenario: muros, suelos y techos con luz ambiente y niebla.
             wallShader.use();
@@ -86,10 +99,10 @@ final class SceneRenderer {
             wallShader.setMat4("view", view);
 
             wallShader.setVec3("lightPos", lightPos);
-            wallShader.setVec3("lightColor", ConfigGlobal.LUZ_R, ConfigGlobal.LUZ_G, ConfigGlobal.LUZ_B);
+            wallShader.setVec3("lightColor", LightingConfig.LUZ_R, LightingConfig.LUZ_G, LightingConfig.LUZ_B);
             wallShader.setVec3("viewPos", cameraPos);
-            wallShader.setFloat("emissionStrength", ConfigGlobal.EMISION);
-            wallShader.setFloat("glowIntensity", ConfigGlobal.BRILLO);
+            wallShader.setFloat("emissionStrength", LightingConfig.EMISION);
+            wallShader.setFloat("glowIntensity", LightingConfig.BRILLO);
             wallShader.setFloat("u_brillo", VideoSettings.brillo);
             wallShader.setFloat("u_contraste", VideoSettings.contraste);
             setAtmosphere(wallShader, preset, viewDistance);
@@ -105,7 +118,7 @@ final class SceneRenderer {
                 propShader.setMat4("projection", projection);
                 propShader.setMat4("view", view);
                 propShader.setVec3("lightPos", lightPos);
-                propShader.setVec3("lightColor", ConfigGlobal.LUZ_R, ConfigGlobal.LUZ_G, ConfigGlobal.LUZ_B);
+                propShader.setVec3("lightColor", LightingConfig.LUZ_R, LightingConfig.LUZ_G, LightingConfig.LUZ_B);
                 propShader.setVec3("viewPos", cameraPos);
                 propShader.setFloat("u_brillo", VideoSettings.brillo);
                 propShader.setFloat("u_contraste", VideoSettings.contraste);

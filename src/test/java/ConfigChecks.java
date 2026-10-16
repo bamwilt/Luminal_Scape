@@ -20,7 +20,7 @@ public final class ConfigChecks {
     private static final String VIDEO_SETTINGS = "src/main/java/Core/VideoSettings.java";
     private static final String WALL_SHADER = "src/main/resources/shaders/wall_fragment.glsl";
     private static final String PROP_SHADER = "src/main/resources/shaders/prop_fragment.glsl";
-    private static final String SLIDER = "src/main/java/Render2D/ui/Slider.java";
+    private static final String SLIDER = "src/main/java/Render2D/components/Slider.java";
     private static final String MENU_SCREENS = "src/main/java/Core/MenuScreens.java";
     private static final String GAME_LOOP = "src/main/java/Core/GameLoop.java";
     private static final String INPUT_HANDLER = "src/main/java/Core/InputHandler.java";

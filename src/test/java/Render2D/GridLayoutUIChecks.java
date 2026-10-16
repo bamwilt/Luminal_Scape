@@ -1,7 +1,7 @@
 package Render2D;
 
 import Render2D.layout.GridLayoutUI;
-import Render2D.ui.UIComponent;
+import Render2D.components.UIComponent;
 
 /**
  * Comprobaciones headless de {@link GridLayoutUI}.
@@ -264,6 +264,16 @@ public final class GridLayoutUIChecks {
         @Override
         public float getAlto() {
             return alto;
+        }
+
+        @Override
+        public float getX() {
+            return boundsX;
+        }
+
+        @Override
+        public float getY() {
+            return boundsY;
         }
 
         @Override

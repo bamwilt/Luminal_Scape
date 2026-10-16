@@ -1,10 +1,12 @@
 Render2D/GridLayoutUIChecks$FakeLabel.class
 PausaRapidaChecks.class
+LevelRatingChecks.class
 Render3D/map/DecorGlyphChecks.class
 Render3D/map/ItemsMapChecks.class
 Render2D/MinimapItemsChecks.class
 Render2D/MinimapPaletteChecks.class
 Render2D/DashboardLayoutChecks$Fake.class
+ConfigChecks.class
 Render2D/MinimapArrowChecks.class
 Render2D/GridLayoutUIChecks$FakeButton.class
 Render3D/map/LucesChecks.class

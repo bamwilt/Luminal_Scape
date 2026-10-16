@@ -1,6 +1,7 @@
 package Render2D;
 
 import Render3D.map.MapConfig;
+import Render2D.components.Minimap;
 
 /**
  * Comprobaciones headless de la flecha del minimapa.

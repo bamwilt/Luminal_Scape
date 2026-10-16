@@ -1,13 +1,24 @@
 package Core;
 
+import ConfigGlobal.CameraConfig;
+import ConfigGlobal.ResourceConfig;
+import ConfigGlobal.ScreenConfig;
+import ConfigGlobal.TimeConfig;
+
 import Audio.AudioSystem;
 import Player.InputPlayer;
 import Player.MouseController;
 import Player.Player;
-import Render2D.Minimap;
-import Render2D.QuadBatch;
-import Render2D.TextRenderer;
-import Render2D.VisionManager;
+import Render2D.camera.Camera;
+import Render2D.camera.TitleCameraAnimator;
+import Render2D.render.layers.RenderLayers;
+import Render2D.components.Minimap;
+import Render2D.components.QuadBatch;
+import Render2D.components.TextRenderer;
+import Render2D.components.VisionManager;
+import Render2D.effects.EffectManager;
+import Render2D.effects.LevelTransitionEffect;
+import Render2D.effects.FadeEffect;
 import Render3D.TextureLoader;
 import Render3D.collision.CollisionManager;
 import Render3D.item.Item;
@@ -28,6 +39,8 @@ public class GameLoop {
     private static InputPlayer inputPlayer;
     private static MouseController mouseController;
     private static SceneRenderer scene;
+    /** Camara aerea animada para el fondo de la pantalla de titulo. */
+    private static TitleCameraAnimator titleCamera;
     private static float elapsedTime = 0f;
     private static GameWindow window;
     private static TextRenderer textRenderer;
@@ -47,6 +60,9 @@ public class GameLoop {
     private static VisionManager visionManager;
     private static QuadBatch loteUi;
     private static Minimap minimap;
+    private static RenderLayers renderLayers;
+    private static EffectManager effectManager;
+    private static boolean developerMode = false;
 
     private static GameState state = GameState.TITLE;
 
@@ -56,8 +72,8 @@ public class GameLoop {
     /** Segundos que da un item según la dificultad (Difícil: -3s). */
     private static int itemBonusSeconds() {
         return levelSession.isDificil()
-                ? ConfigGlobal.SEGUNDOS_POR_ITEM - 3
-                : ConfigGlobal.SEGUNDOS_POR_ITEM;
+                ? TimeConfig.SEGUNDOS_POR_ITEM - 3
+                : TimeConfig.SEGUNDOS_POR_ITEM;
     }
 
     /**
@@ -77,6 +93,16 @@ public class GameLoop {
     // Fin de la lista de niveles: muestra "END" y vuelve al título.
     private static float endStartTime = 0f;
     private static final float END_TO_TITLE_DELAY = 3.5f;
+
+    /** Mejor puntuacion (estrellas) conseguida en cada nivel, por indice. */
+    private static int[] bestStars;
+    /** Mejor tiempo (segundos) por nivel, para detectar records. */
+    private static float[] bestTimes;
+    /** Tiempo total jugado en la sesion, para el resumen final (END). */
+    private static float tiempoTotalJugado = 0f;
+
+    /** Fundido a negro a pantalla completa (capa POPUPS): transiciones y revelados. */
+    private static ScreenFade screenFade;
 
     private static int wallTexture;
     private static int floorTexture;
@@ -109,6 +135,13 @@ public class GameLoop {
     private static boolean key9Prev = false;
     private static boolean key0Prev = false;
 
+    // Estado de entrada para toggle de capas (1/2/3/4) en modo desarrollador.
+    private static boolean key1Prev = false;
+    private static boolean key2Prev = false;
+    private static boolean key3Prev = false;
+    private static boolean key4Prev = false;
+    private static boolean keyTPrev = false;
+
     private static int currentFPS = 0;
     private static final FpsCounter fpsCounter = new FpsCounter();
 
@@ -120,7 +153,7 @@ public class GameLoop {
     }
 
     private static void initApplication() {
-        window = new GameWindow(ConfigGlobal.ANCHO_VENTANA, ConfigGlobal.ALTO_VENTANA, ConfigGlobal.TITULO_VENTANA);
+        window = new GameWindow(ScreenConfig.ANCHO_VENTANA, ScreenConfig.ALTO_VENTANA, ScreenConfig.TITULO_VENTANA);
         window.init();
         window.toggleFullscreen();
         collisionManager = new CollisionManager();
@@ -130,7 +163,7 @@ public class GameLoop {
         mouseController = new MouseController(player, window.getWindowHandle());
         mouseController.setCaptured(false);
 
-        textRenderer = new TextRenderer(ConfigGlobal.RUTA_FUENTE, ConfigGlobal.TAMANO_FUENTE);
+        textRenderer = new TextRenderer(ResourceConfig.RUTA_FUENTE, ResourceConfig.TAMANO_FUENTE);
 
         // La sesión de nivel se crea antes que los menús, que leen de ella los
         // nombres que muestran los selectores.
@@ -178,6 +211,7 @@ public class GameLoop {
 
             @Override
             public void closeConfig() {
+
                 GameLoop.closeConfig();
             }
 
@@ -214,6 +248,21 @@ public class GameLoop {
             @Override
             public void goToTitle() {
                 GameLoop.goToTitle();
+            }
+
+            @Override
+            public void nextLevel() {
+                GameLoop.nextLevel();
+            }
+
+            @Override
+            public void retryLevel() {
+                GameLoop.retryLevel();
+            }
+
+            @Override
+            public void finishGame() {
+                GameLoop.finishGame();
             }
 
             @Override
@@ -267,14 +316,23 @@ public class GameLoop {
             public void closeConfig() {
                 GameLoop.closeConfig();
             }
+
+            @Override
+            public void toggleDeveloperMode() {
+                GameLoop.toggleDeveloperMode();
+            }
         });
 
         textRenderer.setProjection(menus.virtualW(), menus.virtualH());
 
         initDungeon();
         scene = new SceneRenderer(window, levelSession, dungeonManager);
+        titleCamera = new TitleCameraAnimator(dungeonManager, null, TitleCameraAnimator.Modo.SMOOTH);
         initVision();
         initUiLayer();
+        renderLayers = new RenderLayers();
+        effectManager = new EffectManager();
+        screenFade = new ScreenFade();
         menus.refreshLabels();
 
         window.setOnResizeCallback((w2, h2) -> {
@@ -285,7 +343,6 @@ public class GameLoop {
             menus.layout();
         });
 
-        GL11.glEnable(GL11.GL_DEPTH_TEST);
     }
 
     private static void initDungeon() {
@@ -306,14 +363,14 @@ public class GameLoop {
         LevelTypePreset preset = levelSession.data().getPreset();
 
         String floorPath = preset.getFloorTexture() != null
-                ? preset.getFloorTexture() : ConfigGlobal.TEXTURA_SUELO;
+                ? preset.getFloorTexture() : ResourceConfig.TEXTURA_SUELO;
         if (!floorPath.equals(loadedFloorTexture)) {
             floorTexture = TextureLoader.loadTexture(floorPath);
             loadedFloorTexture = floorPath;
         }
 
         String ceilingPath = preset.getCeilingTexture() != null
-                ? preset.getCeilingTexture() : ConfigGlobal.TEXTURA_TECHO;
+                ? preset.getCeilingTexture() : ResourceConfig.TEXTURA_TECHO;
         if (!ceilingPath.equals(loadedCeilingTexture)) {
             ceilingTexture = TextureLoader.loadTexture(ceilingPath);
             loadedCeilingTexture = ceilingPath;
@@ -323,7 +380,7 @@ public class GameLoop {
         // de los backrooms al pasillo dejaba el muro amarillo del nivel
         // anterior pegado al hormigon nuevo.
         String wallPath = preset.getWallTexture() != null
-                ? preset.getWallTexture() : ConfigGlobal.TEXTURA_PARED;
+                ? preset.getWallTexture() : ResourceConfig.TEXTURA_PARED;
         if (!wallPath.equals(loadedWallTexture)) {
             wallTexture = TextureLoader.loadTexture(wallPath);
             loadedWallTexture = wallPath;
@@ -347,6 +404,17 @@ public class GameLoop {
     private static void stepLevel(int delta) {
         levelSession.stepLevel(delta);
         loadCurrentLevel();
+        // Aplicar el layout del nuevo nivel al dungeonManager para que la
+        // camara aerea del titulo renderice el nivel correcto.
+        dungeonManager.applyLayout(levelSession.data().toRows(), wallTexture, floorTexture, ceilingTexture, lightCeilingTexture);
+        dungeonManager.registerCollisions(collisionManager);
+        // Reconstruir los puntos de interes de la camara (items del nuevo nivel).
+        if (titleCamera != null) {
+            titleCamera.reconstruirPuntos();
+        }
+        // Efecto de transición: rectángulo con nombre del nivel que se desvanece
+        effectManager.add(new LevelTransitionEffect(textRenderer, levelSession.name(),
+                menus.virtualW(), menus.virtualH()));
         refreshSelectorLabels();
     }
 
@@ -365,6 +433,18 @@ public class GameLoop {
         refreshSelectorLabels();
     }
 
+    /** Alterna el modo desarrollador (tecla T). */
+    private static void toggleDeveloperMode() {
+        developerMode = !developerMode;
+        if (!developerMode) {
+            // Al salir, resetear capas a todas activadas
+            renderLayers.resetAllLayers();
+        }
+        // Mensaje en pantalla (toast) en lugar de consola
+        visionManager.showMessage("DEV MODE: " + (developerMode ? "ON" : "OFF"), 
+                0.3f, 0.86f, 0.35f, 0.85f, 2.0f);
+    }
+
     /**
      * Vuelca el nivel y la dificultad en sus rótulos y recoloca la cuadrícula.
      *
@@ -377,7 +457,7 @@ public class GameLoop {
     }
 
     private static void initVision() {
-        visionManager = new VisionManager(ConfigGlobal.RUTA_FUENTE, ConfigGlobal.TAMANO_FUENTE_VISION);
+        visionManager = new VisionManager(ResourceConfig.RUTA_FUENTE, ResourceConfig.TAMANO_FUENTE_VISION);
         visionManager.setProjection(menus.virtualW(), menus.virtualH());
     }
 
@@ -417,16 +497,22 @@ public class GameLoop {
             player.setPosition(spawn);
         } else {
             player.getCamara().setPosition(new Vector3f(
-                    ConfigGlobal.CAMARA_X,
-                    ConfigGlobal.CAMARA_Y,
-                    ConfigGlobal.CAMARA_Z));
+                    CameraConfig.CAMARA_X,
+                    CameraConfig.CAMARA_Y,
+                    CameraConfig.CAMARA_Z));
         }
         player.getCamara().setYaw(dungeonManager.getSpawnYaw());
 
-        visionManager.showMessage(levelSession.name(), 1f, 0.86f, 0.35f, 0.75f, 2.5f);
+        visionManager.showMessage(levelSession.name(), 1f, 0.86f, 0.35f, 0f, 2.5f);
+
+        // Efecto de transición al iniciar nivel
+        effectManager.add(new LevelTransitionEffect(textRenderer, levelSession.name(),
+                menus.virtualW(), menus.virtualH()));
 
         state = GameState.PLAYING;
         mouseController.setCaptured(true);
+        // Revelado desde negro al entrar en la partida.
+        screenFade.fadeIn(0.45f);
     }
 
     /**
@@ -520,13 +606,90 @@ public class GameLoop {
         // mapa del anterior revelado y el player tendria delante el plano del
         // nivel que acaba de superar.
         minimap.reset();
-        // Sin pantalla de victoria: se carga directamente el siguiente nivel.
-        if (levelSession.isLastLevel()) {
-            endGame();
-        } else {
-            stepLevel(1);
-            startGame();
+
+        // Estrellas: fraccion de tiempo que sobro respecto al limite del nivel.
+        float limite = levelSession.timeSeconds();
+        float restante = gameTimer != null ? gameTimer.getRemainingSeconds() : 0f;
+        float fraccion = limite > 0f ? restante / limite : 0f;
+        int estrellas = LevelRating.estrellas(fraccion);
+        float tardado = gameTimer != null ? gameTimer.getElapsedSeconds() : 0f;
+        int nivel = levelSession.index();
+
+        boolean record = esRecord(nivel, estrellas, tardado);
+        registrarResultado(nivel, estrellas, tardado);
+        tiempoTotalJugado += tardado;
+
+        if (gameTimer != null) {
+            gameTimer.pause();
         }
+        mouseController.setCaptured(false);
+        state = GameState.VICTORY;
+        menus.mostrarVictoria(estrellas, tardado, levelSession.isLastLevel(), record);
+        screenFade.fadeIn(0.40f);
+    }
+
+    /** Carga el siguiente nivel (boton "Siguiente nivel" de la victoria). */
+    private static void nextLevel() {
+        stepLevel(1);
+        startGame();
+    }
+
+    /** Reinicia el nivel actual (boton "Reintentar" de la derrota). */
+    private static void retryLevel() {
+        startGame();
+    }
+
+    /** Da la partida por terminada (boton "Finalizar" del ultimo nivel). */
+    private static void finishGame() {
+        endGame();
+    }
+
+    /** ¿La partida mejora lo guardado? (mas estrellas, o mismas y menos tiempo). */
+    private static boolean esRecord(int nivel, int estrellas, float tardado) {
+        if (bestStars == null || nivel < 0 || nivel >= bestStars.length) {
+            return estrellas > 0;
+        }
+        if (estrellas > bestStars[nivel]) {
+            return true;
+        }
+        return estrellas == bestStars[nivel] && bestTimes != null
+                && nivel < bestTimes.length && bestTimes[nivel] > 0f
+                && tardado < bestTimes[nivel];
+    }
+
+    /**
+     * Guarda, por nivel, la mejor puntuacion y el mejor tiempo de la sesion.
+     * Los records son en memoria: duran lo que la partida.
+     */
+    private static void registrarResultado(int nivel, int estrellas, float tardado) {
+        if (bestStars == null || bestStars.length != levelSession.count()) {
+            bestStars = new int[levelSession.count()];
+            bestTimes = new float[levelSession.count()];
+        }
+        if (bestTimes == null || bestTimes.length != bestStars.length) {
+            bestTimes = new float[bestStars.length];
+        }
+        if (nivel >= 0 && nivel < bestStars.length) {
+            if (estrellas > bestStars[nivel]) {
+                bestStars[nivel] = estrellas;
+            }
+            if (bestTimes[nivel] <= 0f || tardado < bestTimes[nivel]) {
+                bestTimes[nivel] = tardado;
+            }
+        }
+        menus.setBestStars(bestStars);
+    }
+
+    /** Suma de las mejores estrellas de cada nivel. */
+    private static int estrellasTotales() {
+        if (bestStars == null) {
+            return 0;
+        }
+        int total = 0;
+        for (int s : bestStars) {
+            total += s;
+        }
+        return total;
     }
 
     private static void loseGame() {
@@ -537,11 +700,13 @@ public class GameLoop {
         // de un nivel ya terminado no debe quedar encendido.
         minimap.reset();
         if (gameTimer != null) {
+            tiempoTotalJugado += gameTimer.getElapsedSeconds();
             gameTimer.pause();
         }
-        state = GameState.PAUSED;
         mouseController.setCaptured(false);
-        visionManager.showMessage("SE ACABO EL TIEMPO", 1f, 0.05f, 0.05f, 0.8f, 2.5f);
+        state = GameState.VICTORY;
+        menus.mostrarDerrota();
+        screenFade.fadeIn(0.40f);
     }
 
     /** Fin de todos los niveles: "END" y, tras un momento, al título. */
@@ -552,13 +717,17 @@ public class GameLoop {
         minimap.reset();
         mouseController.setCaptured(false);
         endStartTime = elapsedTime;
-        visionManager.showMessage("END", 1f, 0.86f, 0.35f, 0.85f, END_TO_TITLE_DELAY);
+        menus.mostrarFinal(estrellasTotales(),
+                levelSession.count() * LevelRating.MAX_ESTRELLAS,
+                tiempoTotalJugado);
+        screenFade.fadeIn(0.45f);
     }
 
     private static void goToTitle() {
         state = GameState.TITLE;
         levelSession.goToFirst();
         mouseController.setCaptured(false);
+        screenFade.fadeIn(0.45f);
     }
 
     /**
@@ -571,6 +740,7 @@ public class GameLoop {
     private static void returnToTitle() {
         state = GameState.TITLE;
         mouseController.setCaptured(false);
+        screenFade.fadeIn(0.45f);
     }
 
     /** Aplica la resolucion elegida en el desplegable del menu de pausa. */
@@ -672,6 +842,36 @@ public class GameLoop {
     }
 
     private static void handleNumKeys(long handle) {
+        if (!developerMode) {
+            return;
+        }
+
+        // 1,2,3,4 = toggle capas BASE, SCENE_3D, UI_2D, POPUPS
+        boolean k1 = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_1) == GLFW.GLFW_PRESS;
+        if (k1 && !key1Prev) {
+            renderLayers.toggleLayer(RenderLayers.Layer.BASE);
+        }
+        key1Prev = k1;
+
+        boolean k2 = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_2) == GLFW.GLFW_PRESS;
+        if (k2 && !key2Prev) {
+            renderLayers.toggleLayer(RenderLayers.Layer.SCENE_3D);
+        }
+        key2Prev = k2;
+
+        boolean k3 = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_3) == GLFW.GLFW_PRESS;
+        if (k3 && !key3Prev) {
+            renderLayers.toggleLayer(RenderLayers.Layer.UI_2D);
+        }
+        key3Prev = k3;
+
+        boolean k4 = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_4) == GLFW.GLFW_PRESS;
+        if (k4 && !key4Prev) {
+            renderLayers.toggleLayer(RenderLayers.Layer.POPUPS);
+        }
+        key4Prev = k4;
+
+        // 8,9,0 = efectos de visión (solo en modo desarrollador)
         boolean k8 = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_8) == GLFW.GLFW_PRESS;
         if (k8 && !key8Prev) {
             visionManager.showMessage("PELIGRO", 1f, 0.05f, 0.05f, 0.75f, 1.8f);
@@ -699,6 +899,9 @@ public class GameLoop {
     private static void update() {
         float deltaTime = TimeUtils.getDeltaTime();
         elapsedTime += deltaTime;
+        if (screenFade != null) {
+            screenFade.update(deltaTime);
+        }
         // Los pasos solo suenan mientras la partida está activa (y no congelada: si el
         // juego esta parado, el player tampoco esta caminando).
         float playerSpeed = (state == GameState.PLAYING && !frozen
@@ -715,6 +918,8 @@ public class GameLoop {
             Item picked = dungeonManager.update(player.getPosition(), deltaTime);
             if (picked != null) {
                 audioSystem.playPicked();
+                // Destello breve de feedback al recoger (capa EFFECTS, bajo la UI).
+                effectManager.add(new FadeEffect(0.28f, 0.30f, 0f, 0.95f, 0.98f, 1.0f));
                 if (picked instanceof ItemMap) {
                     // El mapa no da tiempo: enciende y revela el minimapa.
                     minimap.revealAll();
@@ -744,71 +949,92 @@ public class GameLoop {
             }
         }
 
-        if (state == GameState.END && elapsedTime - endStartTime >= END_TO_TITLE_DELAY) {
-            goToTitle();
-        }
     }
 
     private static void mainLoop() {
-        TimeUtils.setFPS(ConfigGlobal.FPS_OBJETIVO);
+        TimeUtils.setFPS(ScreenConfig.FPS_OBJETIVO);
         window.loop(() -> {
             TimeUtils.update();
             fpsCounter.update(TimeUtils.getDeltaTime());
             currentFPS = fpsCounter.getCurrentFPS();
 
-            clearScreen();
             visionManager.update(TimeUtils.getDeltaTime());
             inputHandler.handle(state);
             update();
 
-            scene.render(player, elapsedTime, viewDistance());
-            renderUI();
+            // --- Capa BASE: fondo negro sólido ---
+            renderLayers.beginFrame();
+
+            // --- Capa SCENE_3D: cielo, geometría, props, items ---
+            if (renderLayers.beginLayer(RenderLayers.Layer.SCENE_3D)) {
+                // Pantalla de titulo: fondo 3D animado con camara aerea;
+                // el resto de estados usa la camara del jugador. Configuracion
+                // abierta desde el titulo conserva la camara del titulo para
+                // que el fondo 3D no de un salto al abrirla.
+                boolean fondoDeTitulo = state == GameState.TITLE
+                        || (state == GameState.CONFIG && configBackState == GameState.TITLE);
+                if (fondoDeTitulo && titleCamera != null) {
+                    titleCamera.update(TimeUtils.getDeltaTime(), elapsedTime);
+                    scene.renderWithCamera(titleCamera.getCamera(), elapsedTime, viewDistance());
+                } else {
+                    scene.render(player, elapsedTime, viewDistance());
+                }
+                renderLayers.endLayer(RenderLayers.Layer.SCENE_3D);
+            }
+
+            // --- Capa EFFECTS: transiciones, partículas, overlays full-screen ---
+            if (renderLayers.beginLayer(RenderLayers.Layer.EFFECTS)) {
+                effectManager.update(TimeUtils.getDeltaTime());
+                effectManager.draw(menus.virtualW(), menus.virtualH());
+                renderLayers.endLayer(RenderLayers.Layer.EFFECTS);
+            }
+
+            // --- Capa UI_2D: HUD, minimapa, paneles, botones, sliders ---
+            if (renderLayers.beginLayer(RenderLayers.Layer.UI_2D)) {
+                renderUI2D();
+                renderLayers.endLayer(RenderLayers.Layer.UI_2D);
+            }
+
+            // --- Capa POPUPS: ComboBox opciones, tooltips, toasts, overlays ---
+            if (renderLayers.beginLayer(RenderLayers.Layer.POPUPS)) {
+                renderPopups();
+                renderLayers.endLayer(RenderLayers.Layer.POPUPS);
+            }
+
+            // VisionManager (toasts, overlays) se dibuja en POPUPS
             visionManager.render();
         });
     }
 
-    private static void clearScreen() {
-        // Se limpia con el color del horizonte del nivel, que es el mismo que
-        // usa la niebla: cualquier pixel que no cubra ni el cielo ni la
-        // geometria queda del color del fondo y no se ve el corte.
-        Vector3f horizon = levelSession.data().getPreset().getSkyHorizonColor();
-        GL11.glClearColor(horizon.x, horizon.y, horizon.z, 1.0f);
-        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-    }
-
-    private static void renderUI() {
-        // La UI se dibuja entera en unidades de interfaz: el factor de scale
-        // se recalcula aqui porque la window puede haber cambiado de tamaño
-        // sin que haya pasado por el callback de resize.
+    /**
+     * Dibuja la UI 2D persistente: HUD, minimapa, paneles de menús.
+     * Se llama dentro de la capa UI_2D (estado GL ya configurado).
+     */
+    private static void renderUI2D() {
         menus.updateUiScale(window.getWidth(), window.getHeight());
         int w = menus.virtualW();
         int h = menus.virtualH();
 
-        GL11.glDepthMask(false);
-        GL11.glEnable(GL11.GL_BLEND);
-        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-
         // Capas de fondo y minimapa (batch único).
         switch (state) {
             case TITLE:
-                loteUi.addQuad(0, 0, w, h, 0f, 0f, 0f, 0.75f);
+                loteUi.addQuad(0, 0, w, h, 0f, 0f, 0f, 0.0f);
                 break;
             case PAUSED:
-                // El minimapa NO se dibuja en pausa. El menú va sobre un fondo
-                // plano, y el plano del nivel encima solo estorba (se solapa con
-                // los botones y con la pista de controles) y confunde: en pausa
-                // el nivel ya esta en marcha o ya se ha perdido, y el mapa se
-                // apaga al salir de uno y de otro (ver winGame/loseGame).
-                loteUi.addQuad(0, 0, w, h, 0f, 0f, 0f, 0.5f);
+                loteUi.addQuad(0, 0, w, h, 0f, 0f, 0f, 1.0f);
                 break;
             case END:
-                loteUi.addQuad(0, 0, w, h, 0f, 0f, 0f, 0.88f);
+                loteUi.addQuad(0, 0, w, h, 0f, 0f, 0f, 1.0f);
+                break;
+            case VICTORY:
+                loteUi.addQuad(0, 0, w, h, 0f, 0f, 0f, 1.0f);
                 break;
             case PLAYING:
                 minimap.draw(loteUi, w, h, player.getPosition(), player.getCamara().getYaw());
                 break;
             case CONFIG:
-                loteUi.addQuad(0, 0, w, h, 0f, 0f, 0f, 0.82f);
+                // Sin velo: el panel de Configuracion ya tiene su propio fondo
+                // y se deja ver la escena 3D que hay detras (titulo o partida).
                 break;
             default:
                 break;
@@ -829,12 +1055,27 @@ public class GameLoop {
             case CONFIG:
                 menus.renderConfig(w, h);
                 break;
+            case VICTORY:
+                menus.renderVictory(w, h);
+                break;
             default:
                 break;
         }
+    }
 
-        GL11.glDisable(GL11.GL_BLEND);
-        GL11.glDepthMask(true);
+    /**
+     * Dibuja popups temporales: opciones de ComboBox abiertas, tooltips, etc.
+     * Se llama dentro de la capa POPUPS (estado GL ya configurado).
+     */
+    private static void renderPopups() {
+        // ComboBox opciones abiertas (se dibuja al final para que tape todo)
+        if (state == GameState.CONFIG) {
+            menus.renderConfigPopups(menus.virtualW(), menus.virtualH(), window.getWindowHandle());
+        }
+        // Fundido a pantalla completa, por encima de menus y popups.
+        if (screenFade != null) {
+            screenFade.draw(menus.virtualW(), menus.virtualH());
+        }
     }
 
     private static void cleanup() {

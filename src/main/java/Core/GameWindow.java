@@ -53,7 +53,6 @@ public class GameWindow {
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
         glfwWindowHint(GLFW_SAMPLES, 4); // MSAA 4x
-        glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE); // Soporte para transparencia
 
         windowHandle = glfwCreateWindow(width, height, title, NULL, NULL);
         if (windowHandle == NULL) {
@@ -101,7 +100,7 @@ public class GameWindow {
         glEnable(GL_MULTISAMPLE); // Habilitar antialiasing
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glClearColor(0f, 0f, 0f, 0f); // Fondo transparente
+        glClearColor(0f, 0f, 0f, 1f); // Fondo negro (RenderLayers lo gestiona)
         glViewport(0, 0, width, height);
         
         // Configurar callback de debug de OpenGL si está disponible

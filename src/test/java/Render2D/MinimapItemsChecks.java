@@ -1,6 +1,7 @@
 package Render2D;
 
 import Render3D.map.MapConfig;
+import Render2D.components.Minimap;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -82,7 +83,7 @@ public final class MinimapItemsChecks {
 
     /** Los puntos flotantes tienen que salir de la lista de items, no del mapa. */
     private static void losPuntosFlotantesVienenDeItemsVivos() throws Exception {
-        String src = leer("src/main/java/Render2D/Minimap.java");
+        String src = leer("src/main/java/Render2D/components/Minimap.java");
         check(src.contains("for (Vector3f item : dungeon.getItemPositions())"),
                 "los puntos se dibujan desde getItemPositions(), la lista viva");
         // Si el bucle usara el grid, se pintarían llaves ya recogidas.
@@ -98,7 +99,7 @@ public final class MinimapItemsChecks {
      * OpenGL, que no hay en una prueba headless.
      */
     private static void elCodigoUsaItemsVivos() throws Exception {
-        String src = leer("src/main/java/Render2D/Minimap.java");
+        String src = leer("src/main/java/Render2D/components/Minimap.java");
         check(src.contains("boolean[][] occupied"),
                 "hay una matriz de celdas con item vivo");
         check(src.contains("occupied[ir][ic] = true"),

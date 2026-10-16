@@ -12,5 +12,6 @@ enum GameState {
     PLAYING,
     PAUSED,
     CONFIG,
+    VICTORY,
     END
 }

@@ -1,6 +1,6 @@
 package Render2D.layout;
 
-import Render2D.ui.UIComponent;
+import Render2D.components.UIComponent;
 import java.util.ArrayList;
 import java.util.List;
 

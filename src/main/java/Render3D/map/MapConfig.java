@@ -155,7 +155,7 @@ public final class MapConfig {
 
     // ---- Luces locales ----------------------------------------------------
     //
-    // El nivel tiene UNA luz global (ConfigGlobal.LUZ_*), la misma para todo el
+    // El nivel tiene UNA luz global (LightingConfig.LUZ_*), la misma para todo el
     // mapa. Estas son las luces PUNTUALES que se encienden cerca del player: la
     // del techo con luz '◉' y la de cada item. Se acumulan al difuso global, con
     // caida por distancia, y solo se mandan las MAX_LIGHT_COUNT mas cercanas.

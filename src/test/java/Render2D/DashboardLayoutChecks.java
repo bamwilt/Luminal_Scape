@@ -2,8 +2,8 @@ package Render2D;
 
 import Render2D.layout.BorderLayout;
 import Render2D.layout.GridLayout;
-import Render2D.ui.Panel;
-import Render2D.ui.UIComponent;
+import Render2D.components.Panel;
+import Render2D.components.UIComponent;
 
 /**
  * Comprobaciones headless del reparto del dashboard.
@@ -171,6 +171,16 @@ public final class DashboardLayoutChecks {
         @Override
         public float getAlto() {
             return h;
+        }
+
+        @Override
+        public float getX() {
+            return x;
+        }
+
+        @Override
+        public float getY() {
+            return y;
         }
     }
 

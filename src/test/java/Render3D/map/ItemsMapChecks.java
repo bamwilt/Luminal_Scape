@@ -1,7 +1,7 @@
 package Render3D.map;
 
-import Render2D.Minimap;
-import Render2D.UIScale;
+import Render2D.components.Minimap;
+import Render2D.components.UIScale;
 import Render3D.item.ItemKey;
 import Render3D.item.ItemMap;
 import Render3D.item.ItemTime;
@@ -267,7 +267,7 @@ public final class ItemsMapChecks {
         ok(entrada.contains("rotateYaw"), "y gira con rotateYaw");
         ok(entrada.contains("KEY_YAW_SPEED"), "a la velocidad del panel");
 
-        String camara = leer("src/main/java/Player/Camera.java");
+        String camara = leer("src/main/java/Render2D/camera/Camera.java");
         ok(camara.contains("rotateYaw"), "la camara sabe sumar giro");
         ok(camara.contains("setYaw(yaw + grados)"),
                 "rotateYaw se apoya en setYaw, que recalcula direccion y vista");

@@ -1,7 +1,9 @@
 package Core;
 
-import Render2D.TextRenderer;
-import Render2D.ui.ProgressBar;
+import ConfigGlobal.TimeConfig;
+
+import Render2D.components.TextRenderer;
+import Render2D.components.ProgressBar;
 
 /**
  * HUD de partida: contador de llaves, tiempo y avisos ("toast").
@@ -90,10 +92,10 @@ final class HudRenderer {
 
         float remaining = timer.getRemainingSeconds();
         float total = Math.max(1f, levelSeconds);
-        boolean critical = remaining <= timeThreshold(ConfigGlobal.CRITICO_TIEMPO_FRACCION,
-                ConfigGlobal.CRITICO_TIEMPO_MAX_SEGUNDOS, total);
+        boolean critical = remaining <= timeThreshold(TimeConfig.CRITICO_TIEMPO_FRACCION,
+                TimeConfig.CRITICO_TIEMPO_MAX_SEGUNDOS, total);
         boolean warning = !critical && remaining <= timeThreshold(
-                ConfigGlobal.AVISO_TIEMPO_FRACCION, ConfigGlobal.AVISO_TIEMPO_MAX_SEGUNDOS, total);
+                TimeConfig.AVISO_TIEMPO_FRACCION, TimeConfig.AVISO_TIEMPO_MAX_SEGUNDOS, total);
 
         float r = 1f;
         float g = 0.3f;
@@ -107,13 +109,13 @@ final class HudRenderer {
             g = 0.1f;
             b = 0.1f;
             label = "!! " + label;
-            alpha = blinkAlpha(now, ConfigGlobal.CRITICO_TIEMPO_PARPADEO_HZ);
+            alpha = blinkAlpha(now, TimeConfig.CRITICO_TIEMPO_PARPADEO_HZ);
         } else if (warning) {
             // Ambar, parpadeo lento.
             r = 1f;
             g = 0.72f;
             b = 0.1f;
-            alpha = blinkAlpha(now, ConfigGlobal.AVISO_TIEMPO_PARPADEO_HZ);
+            alpha = blinkAlpha(now, TimeConfig.AVISO_TIEMPO_PARPADEO_HZ);
         }
 
         text.drawTope(label, x, y, r, g, b, alpha);
